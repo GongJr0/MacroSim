@@ -160,9 +160,7 @@ cython_debug/
 #.idea/
 
 # Data Files
-*.csv
 *.parquet
 *.pickle
 
 # Debug Notebooks
-*.ipynb
