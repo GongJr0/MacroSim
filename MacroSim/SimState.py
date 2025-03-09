@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional
 
+import pandas as pd
+
 
 @dataclass
 class SimState:
@@ -13,6 +15,7 @@ class SimState:
 
     depreciation: float  # Percent
     capital_production: float  # Percent
+    saving_rate: float  # Percent
 
     pop_tree: dict  # Keys: pre_labor, labor, post_labor (People)
 
@@ -23,6 +26,7 @@ class SimState:
 
     employment: float  # Percent
     labor_hours: float  # Hours per period per person
+    hourly_wage: float  # Currency
 
     shock: bool  # True if economy in shock (i.e. x >= roc_threshold)
 
