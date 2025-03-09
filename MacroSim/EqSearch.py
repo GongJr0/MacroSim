@@ -1,5 +1,6 @@
 from typing import Optional, Any, Literal
 
+from jedi.inference.gradual.typing import Callable
 from pysr import PySRRegressor
 
 from sklearn.ensemble import RandomForestRegressor
@@ -41,24 +42,24 @@ class EqSearch:
 
         self.model = PySRRegressor()
 
+        self.distilled = None
 
-        self.distilled = ...
+        self.eq: Optional[Callable] = None
 
     def distil_split(self, test_size: float = 0.2,
-                     grid_search: bool = True, gs_params: Optional[dict[str, Any]] = ...) -> pd.Series:
+                     grid_search: bool = False, gs_params: Optional[dict[str, Any]] = ...) -> pd.DataFrame:
         X = self.X.copy()
         y = self.y.copy()
 
-        lof = LocalOutlierFactor(n_neighbors=len(X)**0.5, contamination=0.05)
+        lof = LocalOutlierFactor(n_neighbors=int(np.floor(len(X)**0.5)), contamination=0.025)
         lof.fit(X)
-        outliers = [True if lof.negative_outlier_factor_ == -1 else False]
+        outliers = np.where(lof.negative_outlier_factor_ == -1, True, False)
 
         X['outlier'] = outliers
         y['outlier'] = outliers
 
-        X = X[~X['outliers']].drop('outlier', axis=1)
-        y = y[~y['outliers']].drop('outlier', axis=1)
-
+        X = X[~X['outlier']].drop('outlier', axis=1)
+        y = y[~y['outlier']].drop('outlier', axis=1)
 
         X_train, X_test, y_train, y_test = train_test_split(X, y,
                                                             test_size=test_size, random_state=self.random_state)
@@ -70,10 +71,14 @@ class EqSearch:
             gs = GridSearchCV(estimator=RandomForestRegressor(), param_grid=gs_params, cv=5)
             gs.fit(X_train, y_train)
             rf = gs.best_estimator_
+        else:
+            rf.fit(X_train, y_train.values.ravel())
+
+        print(f"RandomForest Score at Distillation: {rf.score(X_test, y_test)}")
 
         distilled_y = rf.predict(self.X)
 
-        return pd.Series(distilled_y, index=y.index)
+        self.distilled = pd.DataFrame(distilled_y, index=self.X.index)
 
     def search(self, binary_ops: VALID_BINARY_OPS = FULL_BINARY_OPS, unary_ops = DEFAULT_UNARY_OPS,
                extra_unary_ops: dict[str, dict[str, Any]] = {},
@@ -88,16 +93,17 @@ class EqSearch:
                            niterations=300,
 
                            binary_operators=binary_ops,
-                           unary_operators=[unary_ops, *[x['julia'] for x in extra_unary]],
-                           extra_sympy_mappings={x[0]: x[1]['sympy'] for x in extra_unary.items()},
-
-                           constraints={'^': (-e, e)},  # type: ignore
+                           unary_operators=[*unary_ops, *[x['julia'] for x in extra_unary.values()]],
+                           extra_sympy_mappings={x[0]: x[1]['sympy'] for x in extra_unary.items()}, # type: ignore
 
                            elementwise_loss=custom_loss if custom_loss else 'L2DistLoss()',
+
+                           verbosity=1,
+                           progress=False,
+                           temp_equation_file=True
                            )
         sr.fit(self.X, self.distilled)
 
         print(sr.get_best())
 
-        return sr.get_best()['lambda_format']
-
+        self.eq: Callable = sr.get_best()['lambda_format']
