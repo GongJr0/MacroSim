@@ -1,15 +1,29 @@
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
 class SimState:
+    # Production Function Modelling Params (Cobb-Douglas)
 
-    A: float  # Capital Productivity
-    c: float  # Propensity to consume
+    # Capital Params
+    A: float  # Capital Productivity (Percent)
+    net_capital: float  # Currency
+    alpha: float  # Share of capital (Percent)
 
-    pop_tree: dict  # Keys: pre_labor, labor, post_labor
-    nat_growth: float  # Natural Population growth
+    depreciation: float  # Percent
+    capital_production: float  # Percent
+
+    pop_tree: dict  # Keys: pre_labor, labor, post_labor (People)
+
+    nat_growth: float  # Percent
+    nat_decline: float  # Percent
+    net_migration: float  # People
+    lf_conversion_rate: float # Percent
+
+    employment: float  # Percent
+    labor_hours: float  # Hours per period per person
 
     shock: bool  # True if economy in shock (i.e. x >= roc_threshold)
 
-    prev_state: dict  # dict(SimState) from previous iteration
+    prev_state: Optional[dict]  # dict(SimState) from previous iteration

@@ -73,4 +73,4 @@ if __name__ == "__main__":
     plt.xticks(rotation=90)
     plt.legend()
     plt.show()
-    plt.savefig('./test/L2 - eps_coef=0.003.png')
+    plt.savefig('./test/outputs/L2 - eps_coef=0.003.png')
