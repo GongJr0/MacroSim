@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "macrosim"
+version = "0.0.1"
+description = "Macroeconomic simulation engine with PySR symbolic regression"
+authors = ["Ege Güney Kıymaç <guneykiymac@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/GongJr0/MacroSim"
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+jedi = ">=0.18.2"
+numpy = ">=1.24.3"
+pandas = ">=2.0.2"
+pysr = ">=1.5.2"
+scikit-learn = ">=1.2.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

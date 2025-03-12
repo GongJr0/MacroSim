@@ -1,6 +1,6 @@
 import pandas as pd
 
-from MacroSim.SimState import SimState
+from macrosim.SimState import SimState
 from dataclasses import asdict
 
 import numpy as np

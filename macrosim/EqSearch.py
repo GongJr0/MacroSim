@@ -45,6 +45,8 @@ class EqSearch:
         self.distilled = None
 
         self.eq: Optional[Callable] = None
+        
+        self.sr = PySRRegressor()
 
     def distil_split(self, test_size: float = 0.2,
                      grid_search: bool = False, gs_params: Optional[dict[str, Any]] = ...) -> pd.DataFrame:
@@ -84,24 +86,21 @@ class EqSearch:
                extra_unary_ops: dict[str, dict[str, Any]] = {},
                custom_loss: Optional[str] = None):
         assert self.distilled.shape == self.y.shape, "Run self.distil_split() before symbolizing."
-
+        sr = self.sr
         extra_unary = self.extra_unary | extra_unary_ops
 
-        sr = PySRRegressor(model_selection='accuracy',  # Do not consider complexity at selection
-
-                           maxsize=30,
-                           niterations=300,
-
-                           binary_operators=binary_ops,
-                           unary_operators=[*unary_ops, *[x['julia'] for x in extra_unary.values()]],
-                           extra_sympy_mappings={x[0]: x[1]['sympy'] for x in extra_unary.items()}, # type: ignore
-
-                           elementwise_loss=custom_loss if custom_loss else 'L2DistLoss()',
-
-                           verbosity=1,
-                           progress=False,
-                           temp_equation_file=True
-                           )
+        sr.set_params(params={
+            'model_selection': 'accuracy',  # Do not consider complexity at selection
+            'maxsize': 30,
+            'niterations': 300,
+            'binary_operators': binary_ops,
+            'unary_operators': [*unary_ops, *[x['julia'] for x in extra_unary.values()]],
+            'extra_sympy_mappings': {x[0]: x[1]['sympy'] for x in extra_unary.items()}, # type: ignore
+            'elementwise_loss': custom_loss if custom_loss else 'L2DistLoss()',
+            'verbosity': 1,
+            'progress': False,
+            'temp_equation_file': True
+        })
         sr.fit(self.X, self.distilled)
 
         print(sr.get_best())

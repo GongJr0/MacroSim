@@ -163,4 +163,9 @@ cython_debug/
 *.parquet
 *.pickle
 
-# Debug Notebooks
+# twine / pypi
+*.pypirc
+*.env
+
+# Release files
+dist/*

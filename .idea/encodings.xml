@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="Encoding">
-    <file url="file://$PROJECT_DIR$/MacroSim/EqSearch.py" charset="ISO-8859-1" />
-    <file url="file://$PROJECT_DIR$/MacroSim/SimEngine.py" charset="ISO-8859-1" />
-    <file url="file://$PROJECT_DIR$/MacroSim/SimState.py" charset="ISO-8859-1" />
-    <file url="file://$PROJECT_DIR$/MacroSim/searchtest.ipynb" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/macrosim/EqSearch.py" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/macrosim/SimEngine.py" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/macrosim/SimState.py" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/macrosim/searchtest.ipynb" charset="ISO-8859-1" />
   </component>
 </project>
