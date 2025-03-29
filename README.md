@@ -24,15 +24,15 @@ We will demonstrate `EqSearch` by creating a fairly complex, yet mathematically 
 
 ### Feature Set
 
-* $\text{Total Population} := N$
-* $\text{Post-Labor Population (Age>65)} := n_{>65}$
-* $\text{Pre-Labor Population} := n_{<15}$
-* $\text{Labor Force} := n_L$
-* $\text{Labor Force Participation Rate} := \gamma$
+* $N := \text{Total Population}$
+* $n_{>65} := \text{Post-Labor Population (Age>65)}$
+* $n_{<15} := \text{Pre-Labor Population}$
+* $n_L := \text{Labor Force}$
+* $\gamma := \text{Labor Force Participation Rate}$
 
 ### Target Variable
 
-* $\text{Hours of Labor} := H_L$
+* $H_L := \text{Hours of Labor} $
 
 A common common real-world definition of $L$ as a function is $L(H_L, w_h) = H_L \cdot w_h$ where $w_h$ represents the average (or median) hourly wage. You'll most likely notice that hours of total labor is a metric that is often recorded, tehrefore you might question reasoning behing endogenizing this variable. However, in a scenario where we're planning to extrapolate over a period of 20-50 year, an extremely accurate model of income generated through population is necessary. Raw demographic metrics can be modelled much more accurately through conventional practices and ML. Therefore, by having demographic metrics create the exogenous framework, we're essentially attempting to reorganize the CD parameters into a more simulation-friendly format.
 
@@ -56,10 +56,7 @@ As you can see, we were able to extensively analyse and reason about the model o
 
 Excluding data preprocessing, symbolic expressions can be generated through two method calls to an `EqSearch` instance. On the backend, `EqSearch` will remove local ouliers with a default contamination rate of $2.5\%$ and $n_{neighbors}=\lfloor n_{df}^{0.5}\rfloor$. Afterwards, a `sklearn.RandomForestRegressor` will be trained on the data and create predictions for the entire dataset. This step makes use of the robustness (aka. insensitivity to outliers) of the RandomForest algorithm to further distil the original labels. Through completing these steps, we aim to reach at a dataset where the features correspond to generalized labels instead of exact outcomes which generally increases the success rate of symbollic regression.
 
-
-
 Knowing that the outcomes of symbolic regression (from PySR) are continuous and cannot be piecewise defined, you can imagine how attempting to fit to an ungeneralized set might turn out; therefore the safer approach of model distillation was picked as a design choice. This is the only additional functionality of `EqSearch` that builds on top of the regression model, therefore users who wish to opt out of distillation can directly utilise PySR and use the output in their simulations through `MacroSim`.
-
 
 Regression outputs are generated with the code:
 
@@ -78,13 +75,13 @@ y=df['target'].to_frame()
 
 eqsr = EqSearch(X=x, y=y)
 
-eqsr.distil_split(grid_search=False) # To enable gridsearch for RandomForest, pass grid_search=True and param_grid={...}
+eqsr.distil_split(grid_search=False)  # To enable gridsearch for RandomForest, pass grid_search=True and param_grid={...}
 
-eqsr.search(custom_loss='L2DistLoss()', # You can refer to PySR docs for predefined loss functions or define a custom 
-                                        # function as a string using julia syntax
+eqsr.search(custom_loss='L2DistLoss()',  # You can refer to PySR docs for predefined loss functions or define a custom 
+                                         # function as a string using julia syntax
 
-            extra_unary_ops={ # There are default lists of binary and unary operations, you cannot add custom binary operations, 
-                              # however you can add unary operations using the format below.
+            extra_unary_ops={  # There are default lists of binary and unary operations, you cannot add custom binary operations but you can choose which 
+                               # operations to allow, You can add unary operations using the format below.
                 'cos2': {
                     'julia': 'cos2(x)=cos(x)^2',
                     'sympy': lambda x: cos(x) ** 2
@@ -95,8 +92,8 @@ eqsr.search(custom_loss='L2DistLoss()', # You can refer to PySR docs for predefi
                 }
             })
 
-print(eqsr.eq) # 'eq' will contain the most accurate equation once EqSearch.search is called. Call EqSearch.sr._equations to get a 
-               # DataFrame representing the whole search space.
+print(eqsr.eq)  # 'eq' will contain the most accurate equation once EqSearch.search is called. Call EqSearch.sr._equations to get a 
+                # DataFrame representing the whole search space.
 
 
 ```

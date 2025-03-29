@@ -12,12 +12,11 @@ from sklearn.neighbors import LocalOutlierFactor
 import pandas as pd
 import numpy as np
 
-from math import e
+VALID_BINARY_OPS = tuple['+', '-', '*', '/', '^']
+FULL_BINARY_OPS: VALID_BINARY_OPS = ('+', '-', '*', '/', '^')
 
-VALID_BINARY_OPS = list[Literal['+', '-', '*', '/', '^']]
-FULL_BINARY_OPS: VALID_BINARY_OPS = ['+', '-', '*', '/', '^']
+DEFAULT_UNARY_OPS: tuple = ('exp', 'log', 'sqrt', 'sin', 'cos')
 
-DEFAULT_UNARY_OPS: list = ['exp', 'log', 'sqrt', 'sin', 'cos']
 
 class EqSearch:
     """
@@ -26,7 +25,7 @@ class EqSearch:
 
     def __init__(self,
                  X: pd.DataFrame,
-                 y: pd.DataFrame, # y.shape = (-1, 1)
+                 y: pd.DataFrame | pd.Series,  # y.shape = (-1, 1)
                  random_state: int = 0) -> None:
         self.extra_unary: dict[str, dict[str, Any]] = {
             'inv': {
@@ -36,7 +35,7 @@ class EqSearch:
         }
 
         self.X = X
-        self.y = y
+        self.y = pd.DataFrame(y)
 
         self.random_state = random_state
 
@@ -45,7 +44,7 @@ class EqSearch:
         self.distilled = None
 
         self.eq: Optional[Callable] = None
-        
+
         self.sr = PySRRegressor()
 
     def distil_split(self, test_size: float = 0.2,
@@ -82,25 +81,33 @@ class EqSearch:
 
         self.distilled = pd.DataFrame(distilled_y, index=self.X.index)
 
-    def search(self, binary_ops: VALID_BINARY_OPS = FULL_BINARY_OPS, unary_ops = DEFAULT_UNARY_OPS,
+    def search(self, binary_ops: VALID_BINARY_OPS = FULL_BINARY_OPS, unary_ops=DEFAULT_UNARY_OPS,
                extra_unary_ops: dict[str, dict[str, Any]] = {},
                custom_loss: Optional[str] = None):
+        
         assert self.distilled.shape == self.y.shape, "Run self.distil_split() before symbolizing."
         sr = self.sr
         extra_unary = self.extra_unary | extra_unary_ops
 
-        sr.set_params(params={
-            'model_selection': 'accuracy',  # Do not consider complexity at selection
-            'maxsize': 30,
-            'niterations': 300,
-            'binary_operators': binary_ops,
-            'unary_operators': [*unary_ops, *[x['julia'] for x in extra_unary.values()]],
-            'extra_sympy_mappings': {x[0]: x[1]['sympy'] for x in extra_unary.items()}, # type: ignore
-            'elementwise_loss': custom_loss if custom_loss else 'L2DistLoss()',
-            'verbosity': 1,
-            'progress': False,
-            'temp_equation_file': True
-        })
+        binary_ops = list(binary_ops)
+        unary_ops = list(unary_ops)
+
+        sr.set_params(
+            model_selection='accuracy',  # type:ignore # Do not consider complexity at selection
+
+            maxsize=30,  # type:ignore
+            niterations=300,  # type:ignore
+
+            binary_operators=binary_ops,  # type:ignore
+            unary_operators=[*unary_ops, *[x['julia'] for x in extra_unary.values()]],  # type:ignore
+            extra_sympy_mappings={x[0]: x[1]['sympy'] for x in extra_unary.items()},  # type: ignore
+
+            elementwise_loss=custom_loss if custom_loss else 'L2DistLoss()',  # type:ignore
+
+            verbosity=1,  # type:ignore
+            progress=False,  # type:ignore
+            temp_equation_file=True  # type:ignore
+        )
         sr.fit(self.X, self.distilled)
 
         print(sr.get_best())

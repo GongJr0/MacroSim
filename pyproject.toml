@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "macrosim"
-version = "0.0.1"
+version = "0.0.14"
 description = "Macroeconomic simulation engine with PySR symbolic regression"
 authors = ["Ege Güney Kıymaç <guneykiymac@gmail.com>"]
 license = "MIT"

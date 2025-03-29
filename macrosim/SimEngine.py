@@ -4,6 +4,9 @@ from macrosim.SimState import SimState
 from dataclasses import asdict
 
 import numpy as np
+from sympy import sin, cos
+from math import e
+
 
 class SimEngine:
 
@@ -30,6 +33,9 @@ class SimEngine:
         self.state.capital_production = s * (1-d)
         return s*y0 * (1-d)
 
+    def scale_A(self, edu, p):
+        ...
+
     def sim_loop(self, steps: int, warm_start: bool = False) -> None:
         Y = []
         s = self.state
@@ -43,6 +49,8 @@ class SimEngine:
             L_base = (s.pop_tree['labor'] * s.employment * s.labor_hours * s.hourly_wage) / 1e6  # Convert to Million $
             L = L_base + np.random.normal(0, L_base*0.05*eps_c)
             a = s.alpha
+
+            print(f"Lab Formula: {s.employment*(sin(s.employment+0.27)*cos(s.employment**0.85)-2.4) * (cos(0.01*sum(s.pop_tree.values())**0.5) - 2.73*sin(s.employment)**2+26.27)+7.63*e-5*sum(s.pop_tree.values())}" )
 
             # Current State Cobb-Douglas
             y = A*(K**a)*(L**(1-a))

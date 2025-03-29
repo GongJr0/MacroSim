@@ -22,7 +22,8 @@ class SimState:
     nat_growth: float  # Percent
     nat_decline: float  # Percent
     net_migration: float  # People
-    lf_conversion_rate: float # Percent
+    lf_conversion_rate: float  # Percent
+    undergrad_rate: float  # Percent
 
     employment: float  # Percent
     labor_hours: float  # Hours per period per person

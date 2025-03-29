@@ -169,3 +169,6 @@ cython_debug/
 
 # Release files
 dist/*
+
+# Research Dist
+researchNotes/*
