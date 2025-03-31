@@ -1,69 +1,166 @@
-import numpy as np
-import scipy.optimize as opt
 import pandas as pd
+import numpy as np
 
+import scipy.optimize as opt
 from typing import Callable
 
 
 class GrowthPatternDetector:
-    def __init__(self):
-        ...
+    def __init__(self) -> None:
+        ...  # Static class
 
     @staticmethod
-    def _linear(a, x, c) -> float:
-        return a * x + c
+    def linear_func_opt(series, a, b) -> np.array:
+        n = len(series)
+        i0 = series.iloc[0]
+
+        out = [i0]
+        for _ in range(1, n):
+            out.append(a*out[-1] + b)
+        return np.array(out)
 
     @staticmethod
-    def _exponential(x, r) -> float:
-        return x * np.exp(r)
+    def linear_func(x, a, b) -> float:
+        return a*x + b
 
     @staticmethod
-    def _logarithmic(x, a, c) -> float:
-        return a * np.sign(x) * np.log(np.abs(x) + 1) + c  # Avoid non-positive log
+    def logarithmic_func_opt(series, a, b) -> np.array:
+        n = len(series)
+        i0 = series.iloc[0]
+        out = [i0]
+
+        for _ in range(1, n):
+            out.append(a * np.log(out[-1]) + b)
+        return np.array(out)
 
     @staticmethod
-    def _power_law(a, t, c) -> float:
-        return a * (t**c)
+    def logarithmic_func(x, a, b) -> float:
+        return a * np.log(x) + b
 
     @staticmethod
-    def _logistic(x, r, k) -> float:
-        return x+ (r*x)*(1 - (x/k))
+    def exponential_func_opt(series, b, c) -> np.array:
+        n = len(series)
+        i0 = series.iloc[0]
+        out = [i0]
+
+        for _ in range(1, n):
+            out.append(np.exp(b*out[-1])+c)
+        return np.array(out)
 
     @staticmethod
-    def fit_pattern(df: pd.DataFrame) -> dict[str, tuple[Callable[[float], float], float]]:
-        out = {k: None for k in df.columns}
-        x_data = np.arange(1, len(df) + 1)  # Time series index
+    def exponential_func(x, b, c) -> float:
+        return np.exp(b * x) + c
 
-        for col in df.columns:
-            y_data = df[col].values
-            best_fit = None
-            best_mse = float("inf")
+    @staticmethod
+    def logistic_func_opt(series, a, b, c, d) -> np.array:
+        n = len(series)
+        i0 = series.iloc[0]
+        out = [i0]
 
-            growth_functions = {
-                "linear": (GrowthPatternDetector._linear, [1, 0]),
-                "exponential": (GrowthPatternDetector._exponential, [0.01]),
-                "logarithmic": (GrowthPatternDetector._logarithmic, [10, -100]),
-                "power_law": (GrowthPatternDetector._power_law, [1, 1]),
-                "logistic": (GrowthPatternDetector._logistic, [0.1, max(df[col].max(), 1)]),
-            }
+        for _ in range(1, n):
+            out.append(
+                a / (1 + np.exp(-b * (out[-1] - c))) + d
+            )
+        return np.array(out)
 
-            for name, (func, p0) in growth_functions.items():
-                try:
-                    params, _ = opt.curve_fit(func, x_data, y_data, p0=p0, maxfev=5000)
-                    y_pred = func(x_data, *params)
-                    mse = np.mean((y_data - y_pred) ** 2)
+    @staticmethod
+    def logistic_func(x, a, b, c, d) -> float:
+        return a / (1 + np.exp(-b * (x - c))) + d
 
-                    if mse < best_mse:
-                        best_mse = mse
-                        best_fit = (name, params)
+    @staticmethod
+    def gompertz_func_opt(series, a, b, c, d) -> np.array:
+        n = len(series)
+        i0 = series.iloc[0]
+        out = [i0]
 
-                except (RuntimeError, ValueError):
-                    continue  # Skip if fitting fails
+        for _ in range(1, n):
+            out.append(
+                a * np.exp(-b * np.exp(-c * out[-1])) + d
+            )
 
-            if best_fit:
-                name, params = best_fit
-                chosen_func = lambda x, func=growth_functions[name][0], params=params: func(x, *params)
-                out[col] = (chosen_func, best_mse)
+        return np.array(out)
 
-        return out
+    @staticmethod
+    def gompertz_func(x, a, b, c, d) -> float:
+        return a * np.exp(-b * np.exp(-c * x)) + d
 
+    def _linear_optimize(self, series: pd.Series) -> tuple[Callable[[float], float], float]:
+        # Drop first index of series (output of growth functions are X_{i+1})
+        y_true = series.values
+        p0_args = [1, 0]  # i.e. 0-growth
+
+        def objective(w):
+            pred = self.linear_func_opt(series, *w)
+            return ((pred-y_true)**2).mean()
+
+        out = opt.minimize(objective, np.array(p0_args))
+        mse = ((self.linear_func_opt(series, *out.x) - y_true) ** 2).mean()
+
+        def fitted_func() -> Callable[[float], float]:
+            return lambda x, func=self.linear_func, params=out["x"]: func(x, *params)
+
+        return fitted_func(), mse
+
+    def _logarithmic_optimize(self, series: pd.Series) -> tuple[Callable[[float], float], float]:
+        y_true = series.values
+        p0_args = [1, 0]  # Initial parameters for a and b
+
+        def objective(w):
+            pred = self.logarithmic_func_opt(series, *w)
+            return ((pred-y_true)**2).mean()
+
+        out = opt.minimize(objective, np.array(p0_args))
+        mse = ((self.logarithmic_func_opt(series, *out.x) - y_true) ** 2).mean()
+
+        def fitted_func() -> Callable[[float], float]:
+            return lambda x, func=self.logarithmic_func, params=out["x"]: func(x, *params)
+
+        return fitted_func(), mse
+
+    def _exponential_optimize(self, series: pd.Series) -> tuple[Callable[[float], float], float]:
+        y_true = series.values
+        p0_args = [1, 0]
+
+        def objective(w):
+            pred = self.exponential_func_opt(series, *w)
+            return ((pred-y_true)**2).mean()
+
+        out = opt.minimize(objective, np.array(p0_args))
+        mse = ((self.exponential_func_opt(series, *out.x) - y_true) ** 2).mean()
+
+        def fitted_func() -> Callable[[float], float]:
+            return lambda x, func=self.exponential_func, params=out["x"]: func(x, *params)
+
+        return fitted_func(), mse
+
+    def _logistic_optimize(self, series: pd.Series) -> tuple[Callable[[float], float], float]:
+        y_true = series.values
+        p0_args = [1, 1, 0.5, 0]
+
+        def objective(w):
+            pred = self.logistic_func_opt(series, *w)
+            return ((pred-y_true)**2).mean()
+
+        out = opt.minimize(objective, np.array(p0_args))
+        mse = ((self.logistic_func_opt(series, *out.x) - y_true) ** 2).mean()
+
+        def fitted_func() -> Callable[[float], float]:
+            return lambda x, func=self.logistic_func, params=out["x"]: func(x, *params)
+
+        return fitted_func(), mse
+
+    def _gompertz_optimize(self, series: pd.Series) -> tuple[Callable[[float], float], float]:
+        y_true = series.values
+        p0_args = [1, 1, 1, 1]
+
+        def objective(w):
+            pred = self.gompertz_func_opt(series, *w)
+            return ((pred-y_true)**2).mean()
+
+        out = opt.minimize(objective, np.array(p0_args))
+        mse = ((self.gompertz_func_opt(series, *out.x) - y_true) ** 2).mean()
+
+        def fitted_func() -> Callable[[float], float]:
+            return lambda x, func=self.gompertz_func, params=out["x"]: func(x, *params)
+
+        return fitted_func(), mse
