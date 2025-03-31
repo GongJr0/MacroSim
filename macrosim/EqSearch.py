@@ -118,7 +118,4 @@ class EqSearch:
             parallelism='serial'  # type:ignore
         )
         sr.fit(self.X, self.distilled)
-
-        print(sr.get_best())
-
         self.eq: Callable = sr.get_best()['sympy_format']
