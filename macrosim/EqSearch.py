@@ -15,7 +15,7 @@ import numpy as np
 VALID_BINARY_OPS = tuple['+', '-', '*', '/', '^']
 FULL_BINARY_OPS: VALID_BINARY_OPS = ('+', '-', '*', '/', '^')
 
-DEFAULT_UNARY_OPS: tuple = ('exp', 'log', 'sqrt', 'sin', 'cos')
+DEFAULT_UNARY_OPS: tuple = ('exp', 'log', 'sqrt')
 
 
 class EqSearch:
@@ -84,10 +84,15 @@ class EqSearch:
 
     def search(self, binary_ops: VALID_BINARY_OPS = FULL_BINARY_OPS, unary_ops=DEFAULT_UNARY_OPS,
                extra_unary_ops: Optional[dict[str, dict[str, Any]]] = None,
-               custom_loss: Optional[str] = None):
+               custom_loss: Optional[str] = None,
+               constraints: Optional[dict[str, tuple[int, int]]] = None,
+               **kwargs) -> None:
         
         if extra_unary_ops is None:
             extra_unary_ops = {}
+
+        if constraints is None:
+            constraints = {}
 
         assert self.distilled.shape == self.y.shape, "Run self.distil_split() before symbolizing."
         sr = self.sr
@@ -99,8 +104,8 @@ class EqSearch:
         sr.set_params(
             model_selection='accuracy',  # type:ignore # Do not consider complexity at selection
 
-            maxsize=32,  # type:ignore
-            niterations=300,  # type:ignore
+            maxsize=kwargs.get('maxsize', 32),  # type:ignore
+            niterations=kwargs.get('niterations', 300),  # type:ignore
 
             binary_operators=binary_ops,  # type:ignore
             unary_operators=[*unary_ops, *[x['julia'] for x in extra_unary.values()]],  # type:ignore
@@ -108,11 +113,11 @@ class EqSearch:
 
             elementwise_loss=custom_loss if custom_loss else 'L2DistLoss()',  # type:ignore
 
-            constraints={'^': (-1, 1)},  # type:ignore
+            constraints={'^': (-1, 1)} | constraints,  # type:ignore
 
-            verbosity=1,  # type:ignore
-            progress=False,  # type:ignore
-            temp_equation_file=True,  # type:ignore
+            verbosity=kwargs.get('verbosity', 1),  # type:ignore
+            progress=kwargs.get('progress', False),  # type:ignore
+            temp_equation_file=kwargs.get('temp_equation_file', True),  # type:ignore
             random_state=self.random_state,  # type:ignore
             deterministic=True,  # type:ignore
             parallelism='serial'  # type:ignore

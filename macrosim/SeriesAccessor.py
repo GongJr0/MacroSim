@@ -69,7 +69,7 @@ class SeriesAccessor:
 
     def fill(self,
              data: pd.DataFrame,
-             methods: Sequence[Union[Literal['divide', 'bfill', 'ffill'], Callable[[pd.Series], pd.Series]]]) -> pd.DataFrame:
+             methods: Sequence[Union[Literal['divide', 'bfill', 'ffill', 'mean', 'median', 'IQR_mean'], Callable[[pd.Series], pd.Series]]]) -> pd.DataFrame:
         df = data.copy()
         if len(methods) == len(df.columns):
             methods = [*methods, *[None] * (len(df.columns) - len(methods))]
@@ -103,10 +103,24 @@ class SeriesAccessor:
     def _ffill(series: pd.Series) -> pd.Series:
         return series.ffill(inplace=False)
 
+    @staticmethod
+    def _mean(series: pd.Series) -> pd.Series:
+        return series.mean()
+
+    @staticmethod
+    def _median(series: pd.Series) -> pd.Series:
+        return series.median()
+
+    @staticmethod
+    def _IQR_mean(series: pd.Series) -> pd.Series:
+        return series.loc[(series <= series.quantile(0.75)) & (series >= series.quantile(0.25))].mean()
     @property
     def FILL_MAP(self):
         return {
             'divide': self._fill_equal,
             'bfill': self._bfill,
-            'ffill': self._ffill
+            'ffill': self._ffill,
+            'mean': self._mean,
+            'median': self._median,
+            'IQR_mean': self._IQR_mean
         }

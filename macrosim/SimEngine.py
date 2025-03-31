@@ -5,7 +5,6 @@ from dataclasses import asdict, make_dataclass
 import sympy as sp
 import pandas as pd
 import numpy as np
-import inspect
 
 from io import StringIO
 from copy import copy
