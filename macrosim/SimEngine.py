@@ -1,86 +1,100 @@
+# -*- coding: utf-8 -*-
+
+from dataclasses import asdict, make_dataclass
+
+import sympy as sp
 import pandas as pd
-
-from macrosim.SimState import SimState
-from dataclasses import asdict
-
 import numpy as np
-from sympy import sin, cos
-from math import e
+import inspect
+
+from io import StringIO
+from copy import copy
+
+from typing import Callable, Union, Any, Generator, Type
 
 
 class SimEngine:
+    """Class to iteratively simulate n periods of economic activity using a
+    given symbolic equation and custom growth functions."""
 
-    def __init__(self, init_state: SimState, entropy_coef: float, birth_rate_sensitivity: float):
+    def __init__(self,
+                 eq: sp.Expr,
+                 init_params: dict[str, Union[Any, tuple[Any, Callable[[Any], Any]]]],
+                 deterministic: bool = True,
+                 entropy_coef: float = 0.025,
+                 random_state: int = 42):
+        """
+        :param eq: Callable object derived from `macrosim.EqSearch`. Will be used to derive the primary generator object
+        for iterative extrapolation.
+        :param init_params: Parameters to define the starting point of the simulation and
+        their respective (unary) growth functions as tuples. Dict format is {param_name: (param_val, growth_function)}.
+        if ints are passed as values, no growth will be applied to parameters.
+        :param deterministic: If True, `random_state` will be used to set the seed of all random generators.
+        :param entropy_coef: Variance of the normal distribution, N(1, coef), to sample randomness. This is a multiplicative random term,
+        meaning a coefficient of 0.1 would result in a \u00b1\\10% deviation from deterministic results on average.
+        Set to 0 to disable random adjustments.
+        :param random_state: Pseudo-random seed for periodic stochastic adjustment terms.
+        """
 
-        self.state = init_state
-        self.prev_state = ...
+        # Define function space and params
+        self.eq = eq  # Lambda expression
+        self._param_space: list[str] = list(init_params.keys())
 
-        self.y = pd.DataFrame()
+        for param in init_params.keys():
+            if type(init_params[param]) is int:
+                init_params[param] = (init_params[param], lambda x: x)
 
-        self.alpha_eps = entropy_coef
+        # Generate state recorder
+        self._SimState = make_dataclass('SimState', [*self._param_space, 'output'])
 
-        self.base_gdp_pc = ...
+        init_params['output'] = (0, None)
+        self._prev = self._SimState(**{k: v[0] for k, v in init_params.items()})
 
-        self.brs = birth_rate_sensitivity
-
-        self.records = ...
-
-    def scale_pop_growth(self, b0, y, p):
-        return b0 * (1-(self.brs * ((y/p) / self.base_gdp_pc)))
+        # Growth functions
+        self.growth_functions: dict[str, Callable[[Any], Any]] = {k: v[1] for k,v in init_params.items()}
 
 
-    def scale_K(self, s, d, k0, y0):
-        self.state.capital_production = s * (1-d)
-        return s*y0 * (1-d)
+        # Entropy term generator
+        if deterministic:
+            np.random.seed(random_state)
 
-    def scale_A(self, edu, p):
-        ...
+        self.entropy = self.random_normal(entropy_coef)
 
-    def sim_loop(self, steps: int, warm_start: bool = False) -> None:
-        Y = []
-        s = self.state
-        eps_c = self.alpha_eps
+        # CSV format simulation recorder
+        self._hist = [",".join([*self._param_space, 'output'])]
 
-        state_recs = {k: [] for k in list(asdict(s).keys())}
+    @staticmethod
+    def random_normal(coef) -> Generator[float, None, None]:
+        while True:
+            yield np.random.normal(1, coef)
 
-        for _ in range(steps):
-            A = s.A + np.random.normal(0, 0.1*eps_c)
-            K = s.net_capital + np.random.normal(0, s.net_capital*0.05*eps_c)
-            L_base = (s.pop_tree['labor'] * s.employment * s.labor_hours * s.hourly_wage) / 1e6  # Convert to Million $
-            L = L_base + np.random.normal(0, L_base*0.05*eps_c)
-            a = s.alpha
+    def _simulate(self) -> Generator[Type[Any], None, None]:
+        """
+        A deterministic generator to backend to simulate n periods of
+        economic activity based on symbolic function space.
+        :return: `self.SimState`. `SimState` is a dynamically created dataclass
+        that holds all params and generator output.
+        """
+        eq = self.eq
+        prev = asdict(self._prev)
 
-            print(f"Lab Formula: {s.employment*(sin(s.employment+0.27)*cos(s.employment**0.85)-2.4) * (cos(0.01*sum(s.pop_tree.values())**0.5) - 2.73*sin(s.employment)**2+26.27)+7.63*e-5*sum(s.pop_tree.values())}" )
+        prev_no_output = copy(prev)
+        prev_no_output.pop('output', None)
+        growth_functions = self.growth_functions
+        while True:
+            res = eq.subs(prev_no_output).evalf()
+            param_eval = {
+                k: growth_functions[k](v) * next(self.entropy)
+                for k, v in prev_no_output.items()
+            }
+            param_eval.update({'output': res})
 
-            # Current State Cobb-Douglas
-            y = A*(K**a)*(L**(1-a))
+            self._hist.append(",".join(list(map(str, param_eval.values()))))
+            self._prev = self._SimState(**param_eval)
 
-            Y.append(y)
+            yield self._prev
 
-            if len(Y) == 1:
-                self.base_gdp_pc = Y[0]/sum(s.pop_tree.values())
-
-            s.prev_state = asdict(s)
-
-            # Update state
-            for k in state_recs.keys():
-                state_recs[k].append(asdict(s)[k])
-
-            # Labor
-            s.pop_tree['labor'] += (s.pop_tree['pre_labor'] * s.lf_conversion_rate + s.net_migration)
-            s.pop_tree['pre_labor'] *= max((1+self.scale_pop_growth(s.nat_growth, y, sum(s.pop_tree.values()))), 0)
-            s.pop_tree['post_labor'] *= (1-s.nat_decline)
-
-            # Capital
-
-            s.net_capital += self.scale_K(s.saving_rate, s.depreciation, K, y)
-
-        Y = pd.DataFrame(Y)
-
-        if warm_start:
-            self.y = pd.concat([self.y, Y])
-            self.records = pd.concat([self.records, pd.DataFrame(state_recs)])
-
-        else:
-            self.y = Y
-            self.records = pd.DataFrame(state_recs)
+    def get_history(self) -> pd.DataFrame:
+        df = pd.read_csv(StringIO("\n".join(self._hist)), low_memory=False)
+        df.index.name = 'step'
+        return df

@@ -27,6 +27,7 @@ class EqSearch:
                  X: pd.DataFrame,
                  y: pd.DataFrame | pd.Series,  # y.shape = (-1, 1)
                  random_state: int = 0) -> None:
+
         self.extra_unary: dict[str, dict[str, Any]] = {
             'inv': {
                 'julia': 'inv(x)=1/x',
@@ -48,7 +49,7 @@ class EqSearch:
         self.sr = PySRRegressor()
 
     def distil_split(self, test_size: float = 0.2,
-                     grid_search: bool = False, gs_params: Optional[dict[str, Any]] = ...) -> pd.DataFrame:
+                     grid_search: bool = False, gs_params: Optional[dict[str, Any]] = ...) -> None:
         X = self.X.copy()
         y = self.y.copy()
 
@@ -82,9 +83,12 @@ class EqSearch:
         self.distilled = pd.DataFrame(distilled_y, index=self.X.index)
 
     def search(self, binary_ops: VALID_BINARY_OPS = FULL_BINARY_OPS, unary_ops=DEFAULT_UNARY_OPS,
-               extra_unary_ops: dict[str, dict[str, Any]] = {},
+               extra_unary_ops: Optional[dict[str, dict[str, Any]]] = None,
                custom_loss: Optional[str] = None):
         
+        if extra_unary_ops is None:
+            extra_unary_ops = {}
+
         assert self.distilled.shape == self.y.shape, "Run self.distil_split() before symbolizing."
         sr = self.sr
         extra_unary = self.extra_unary | extra_unary_ops
@@ -106,10 +110,18 @@ class EqSearch:
 
             verbosity=1,  # type:ignore
             progress=False,  # type:ignore
-            temp_equation_file=True  # type:ignore
+            temp_equation_file=True,  # type:ignore
+            random_state=self.random_state,  # type:ignore
+            deterministic=True,  # type:ignore
+            parallelism='serial'  # type:ignore
         )
         sr.fit(self.X, self.distilled)
 
         print(sr.get_best())
 
-        self.eq: Callable = sr.get_best()['lambda_format']
+        self.eq: Callable = sr.get_best()['sympy_format']
+
+    def feature_growth_rates(self):
+        X = self.X
+        rate_dict = {}
+        for

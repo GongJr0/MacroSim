@@ -35,7 +35,9 @@ class SeriesAccessor:
     def get_series(self,
                    series_ids: Sequence[str],
                    date_range: tuple[dt.date, dt.date],
-                   reindex_freq: Optional[str] = None) -> pd.DataFrame:
+                   reindex_freq: Optional[str] = None,
+                   *,
+                   series_alias: Optional[Sequence[str]] = None) -> pd.DataFrame:
 
         _out = []
         _freq = []
@@ -46,10 +48,10 @@ class SeriesAccessor:
             "A": 17, "BA": 18, "AS": 19, "BAS": 20
         }
 
-        for series_id in series_ids:
+        for series_id, alias in zip(series_ids, series_alias):
             series = self.fred.get_series(series_id, observation_start=date_range[0], observation_end=date_range[1])
             series.index = pd.to_datetime(series.index)
-            series.name = series_id
+            series.name = alias if alias else series_id
 
             inferred_freq = pd.infer_freq(series.index)
             _freq.append(inferred_freq if inferred_freq else "MS")
