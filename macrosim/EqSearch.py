@@ -99,14 +99,16 @@ class EqSearch:
         sr.set_params(
             model_selection='accuracy',  # type:ignore # Do not consider complexity at selection
 
-            maxsize=30,  # type:ignore
+            maxsize=32,  # type:ignore
             niterations=300,  # type:ignore
 
             binary_operators=binary_ops,  # type:ignore
             unary_operators=[*unary_ops, *[x['julia'] for x in extra_unary.values()]],  # type:ignore
-            extra_sympy_mappings={x[0]: x[1]['sympy'] for x in extra_unary.items()},  # type: ignore
+            extra_sympy_mappings={x[0]: x[1]['sympy'] for x in extra_unary.items()},  # type:ignore
 
             elementwise_loss=custom_loss if custom_loss else 'L2DistLoss()',  # type:ignore
+
+            constraints={'^': (-1, 1)},  # type:ignore
 
             verbosity=1,  # type:ignore
             progress=False,  # type:ignore
@@ -120,8 +122,3 @@ class EqSearch:
         print(sr.get_best())
 
         self.eq: Callable = sr.get_best()['sympy_format']
-
-    def feature_growth_rates(self):
-        X = self.X
-        rate_dict = {}
-        for
