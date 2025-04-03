@@ -8,8 +8,9 @@ import sympy as sp
 
 
 class NamedFunction:
-    def __init__(self, func: Callable[[float], float], params:list[float], name: str):
+    def __init__(self, func: Callable[[float], float], nature: str, params: list[float], name: str):
         self.func = func
+        self.nature = nature
         self.name = name
         self.params = params
 
@@ -77,7 +78,8 @@ class GrowthDetector:
         mse = ((self.serialize(series, exp_func, *out.x)[:-1] - y_true[1:]) ** 2).mean()
 
         def fitted_func() -> Callable[[float], float]:
-            return NamedFunction(lambda x, func=exp_func, params=out["x"]: func(x, *params),
+            return NamedFunction(lambda x, func=exp_func, params=out.x: func(x, *params),
+                                 nature='exp',
                                  params=out.x,
                                  name=f'Exponential(x, {', '.join([str(i.round(2)) for i in out.x])})')
 
@@ -95,7 +97,8 @@ class GrowthDetector:
         mse = ((self.serialize(series, linear_func, *out.x)[:-1] - y_true[1:]) ** 2).mean()
 
         def fitted_func() -> Callable[[float], float]:
-            return NamedFunction(lambda x, func=linear_func, params=out["x"]: func(x, *params),
+            return NamedFunction(lambda x, func=linear_func, params=out.x: func(x, *params),
+                                 nature='lin',
                                  params=out.x,
                                  name=f'Linear(x, {', '.join([str(i.round(2)) for i in out.x])})')
 
@@ -116,7 +119,8 @@ class GrowthDetector:
         mse = ((self.serialize(series, log_func, *out.x)[:-1] - y_true[1:]) ** 2).mean()
 
         def fitted_func() -> Callable[[float], float]:
-            return NamedFunction(lambda x, func=log_func, params=out["x"]: func(x, *params),
+            return NamedFunction(lambda x, func=log_func, params=out.x: func(x, *params),
+                                 nature='log',
                                  params=out.x,
                                  name=f'Logarithmic(x, {', '.join([str(i.round(2)) for i in out.x])})')
 
@@ -155,10 +159,10 @@ class GrowthDetector:
         viz = {}
         for k in self._out.keys():
             fun = self._out[k][0]
-            if 'Exponential' in fun.__repr__():
+            if 'exp' == fun.nature:
                 viz[k] = self.viz_funcs[0](x, *fun.params).evalf(n=2)
-            elif 'Linear' in fun.__repr__():
+            elif 'lin' == fun.nature:
                 viz[k] = self.viz_funcs[1](x, *fun.params).evalf(n=2)
-            elif 'Logarithmic' in fun.__repr__():
+            elif 'log' in fun.nature:
                 viz[k] = self.viz_funcs[2](x, *fun.params).evalf(n=2)
         return viz
