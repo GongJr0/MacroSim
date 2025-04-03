@@ -8,7 +8,6 @@ from os import getenv, PathLike
 from pathlib import Path
 
 from typing import Union, Sequence, Optional, Literal, Callable, Any
-from warnings import warn
 
 
 class SeriesAccessor:
@@ -114,6 +113,7 @@ class SeriesAccessor:
     @staticmethod
     def _IQR_mean(series: pd.Series) -> pd.Series:
         return series.loc[(series <= series.quantile(0.75)) & (series >= series.quantile(0.25))].mean()
+
     @property
     def FILL_MAP(self):
         return {
