@@ -42,11 +42,11 @@ def linear_func(x, c) -> float:
 
 
 def log_func(x, a, b, r, c) -> float:
-    return a * np.sign(x) * np.log(1+b*np.abs(x)**r)
+    return a * np.sign(x) * np.log(1+b*np.abs(x)**r) + c
 
 
 def log_viz(x, a, b, r, c) -> float:
-    return a * sp.sign(x) * sp.log(1+b*sp.Abs(x)**r)
+    return a * sp.sign(x) * sp.log(1+b*sp.Abs(x)**r) + c
 
 
 class GrowthDetector:
@@ -81,7 +81,7 @@ class GrowthDetector:
             return NamedFunction(lambda x, func=exp_func, params=out.x: func(x, *params),
                                  nature='exp',
                                  params=out.x,
-                                 name=f'Exponential(x, {', '.join([str(i.round(2)) for i in out.x])})')
+                                 name=f"Exponential(x, {', '.join([str(i.round(2)) for i in out.x])})")
 
         return fitted_func(), MSE(mse)
 
@@ -100,7 +100,7 @@ class GrowthDetector:
             return NamedFunction(lambda x, func=linear_func, params=out.x: func(x, *params),
                                  nature='lin',
                                  params=out.x,
-                                 name=f'Linear(x, {', '.join([str(i.round(2)) for i in out.x])})')
+                                 name=f"Linear(x, {', '.join([str(i.round(2)) for i in out.x])})")
 
 
         return fitted_func(), MSE(mse)
@@ -122,7 +122,7 @@ class GrowthDetector:
             return NamedFunction(lambda x, func=log_func, params=out.x: func(x, *params),
                                  nature='log',
                                  params=out.x,
-                                 name=f'Logarithmic(x, {', '.join([str(i.round(2)) for i in out.x])})')
+                                 name=f"Logarithmic(x, {', '.join([str(i.round(2)) for i in out.x])})")
 
 
         return fitted_func(), MSE(mse)
