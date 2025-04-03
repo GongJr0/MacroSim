@@ -32,18 +32,23 @@ def exp_func(x, a, b) -> float:
     return a * x + b
 
 
+def exp_viz(x, a, b) -> float:
+    return sp.sign(x) * a * sp.Abs(x) + b
+
+
 def linear_func(x, c) -> float:
     return x+c
 
 
-def log_func(x, a, r, c) -> float:
-    return a * np.sign(x) * np.abs(x)**r + c
-
-def log_viz(x, a, r, c) -> float:
-    return a * sp.sign(x) * sp.Abs(x)**r + c
+def log_func(x, a, b, r, c) -> float:
+    return a * np.sign(x) * np.log(1+b*np.abs(x)**r)
 
 
-class GrowthPatternDetector:
+def log_viz(x, a, b, r, c) -> float:
+    return a * sp.sign(x) * sp.log(1+b*sp.Abs(x)**r)
+
+
+class GrowthDetector:
     def __init__(self) -> None:
         self._out = None
 
@@ -64,11 +69,12 @@ class GrowthPatternDetector:
         p0_args = [1, 0]  # i.e. 0-growth
 
         def objective(w):
-            pred = self.serialize(series, exp_func, *w)
-            return ((pred-y_true)**2).mean()
+            pred = self.serialize(series, exp_func, *w)[:-1]
+            return ((pred-y_true[1:])**2).mean()
 
-        out = opt.minimize(objective, np.array(p0_args))
-        mse = ((self.serialize(series, exp_func, *out.x) - y_true) ** 2).mean()
+        out = opt.minimize(objective, np.array(p0_args),
+                           bounds=[(1+1e-8, None), (None, None)])
+        mse = ((self.serialize(series, exp_func, *out.x)[:-1] - y_true[1:]) ** 2).mean()
 
         def fitted_func() -> Callable[[float], float]:
             return NamedFunction(lambda x, func=exp_func, params=out["x"]: func(x, *params),
@@ -82,11 +88,11 @@ class GrowthPatternDetector:
         p0_args = [series.pct_change().mean() * series.mean()]
 
         def objective(w):
-            pred = self.serialize(series, linear_func, *w)
-            return ((pred-y_true)**2).mean()
+            pred = self.serialize(series, linear_func, *w)[:-1]
+            return ((pred-y_true[1:])**2).mean()
 
         out = opt.minimize(objective, np.array(p0_args))
-        mse = ((self.serialize(series, linear_func, *out.x) - y_true) ** 2).mean()
+        mse = ((self.serialize(series, linear_func, *out.x)[:-1] - y_true[1:]) ** 2).mean()
 
         def fitted_func() -> Callable[[float], float]:
             return NamedFunction(lambda x, func=linear_func, params=out["x"]: func(x, *params),
@@ -98,16 +104,16 @@ class GrowthPatternDetector:
 
     def _log_optimize(self, series: pd.Series) -> tuple[Callable[[float], float], float]:
         y_true = series.values
-        p0_args = np.array([1, 0.5, 0])
+        p0_args = np.array([1, 1, 0.5, 0])
 
         def objective(w):
-            pred = self.serialize(series, log_func, *w)
-            return ((pred-y_true)**2).mean()
+            pred = self.serialize(series, log_func, *w)[:-1]
+            return ((pred-y_true[1:])**2).mean()
 
         out = opt.minimize(objective, p0_args,
-                           bounds=[(None, None), (1e-10, 1), (None, None)])
+                           bounds=[(None, None), (0, None), (1e-8, 1-1e-8), (None, None)])
 
-        mse = ((self.serialize(series, log_func, *out.x) - y_true) ** 2).mean()
+        mse = ((self.serialize(series, log_func, *out.x)[:-1] - y_true[1:]) ** 2).mean()
 
         def fitted_func() -> Callable[[float], float]:
             return NamedFunction(lambda x, func=log_func, params=out["x"]: func(x, *params),
@@ -138,7 +144,7 @@ class GrowthPatternDetector:
     @property
     def viz_funcs(self) -> list:
         return [
-            exp_func,
+            exp_viz,
             linear_func,
             log_viz
         ]
@@ -150,9 +156,9 @@ class GrowthPatternDetector:
         for k in self._out.keys():
             fun = self._out[k][0]
             if 'Exponential' in fun.__repr__():
-                viz[k] = self.viz_funcs[0](x, *fun.params).evalf(3)
+                viz[k] = self.viz_funcs[0](x, *fun.params).evalf(n=2)
             elif 'Linear' in fun.__repr__():
-                viz[k] = self.viz_funcs[1](x, *fun.params).evalf(3)
+                viz[k] = self.viz_funcs[1](x, *fun.params).evalf(n=2)
             elif 'Logarithmic' in fun.__repr__():
-                viz[k] = self.viz_funcs[2](x, *fun.params).evalf(3)
+                viz[k] = self.viz_funcs[2](x, *fun.params).evalf(n=2)
         return viz
