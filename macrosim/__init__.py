@@ -1,3 +1,3 @@
 from .EqSearch import EqSearch
 from .SimEngine import SimEngine
-from .GrowthPatternDetector import GrowthPatternDetector
+from .GrowthDetector import GrowthPatternDetector
