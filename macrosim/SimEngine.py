@@ -50,7 +50,7 @@ class SimEngine:
         self._prev = self._SimState(**{k: v[0] for k, v in init_params.items()})
 
         # Growth functions
-        self.growth_functions: dict[str, Callable[[Any], Any]] = {k: v[1] for k,v in init_params.items()}
+        self.growth_functions: dict[str, Callable[[Any], Any]] = {k: v[1] for k, v in init_params.items()}
 
 
         # Entropy term generator
