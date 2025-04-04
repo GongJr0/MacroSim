@@ -1,99 +1,179 @@
 # MacroSim
 
-`MacroSim` focuses on the derivation and iterative simulation of symbolic equations derived
-through PySR's symbolic regression. Using well-known and simple economic models, MacroSim
-brings the ability to experiment around the endogenization of model parameters.
+MacroSim focuses on the derivation and iterative simulation of symbolic equations derived
+through PySR's symbolic regression. This approach allows exploratory modelling of economic 
+indicators/variables without the restriction of adapting to predefined models. With a heavy emphasis on
+mathematical interpretability, MacroSim is mainly geared towards research purposes. There's no question that
+a well-implemented predictive regression model can produce more accurate predictions of an economy; However, when it 
+comes to exploring new economic models MacroSim is much better suited in comparison. Using real-world data to tune a 
+symbolic model creates the benefits of:
+- Avoiding unrealistic assumptions (symbolic models based on real-world data do not require assumptions 
+such as information symmetry, efficient markets, perfectly open or closed economies, etc.)
+- Configurability of outputted expressions (The nature, complexity and constraints of equations are highly configurable)
+- Freedom of modelling any variable as a function of others
 
-## Example use cases
+MacroSim, being a simulation engine at its core, cannot rely on historical data in its core logic. Thus, accurately 
+modelling the growth, combined causality, and the extent of entropy in input variables is a crucial step for 
+producing satisfactory results. Symbolic regression ultimately produces an equation that generates an accurate output 
+if and only if the input variables themselves are accurate.
 
-Using the well established Cobb-Douglas function as an example, we can traditionally treat
-the CD equality as the function: $F(K, L, A, \alpha) = AK^\alpha \cdot L^{1-\alpha}$ where all components
-of the function are parametrized instead of derived. For this specific example, we already have defined methodologies
-of approximating (or calculating exactly) the parameters. Said methods were established through rigorous research over
-time and widely accepted. However, such information may not be accessible for many other models of economic structures.
+Fulfilling the requirement of accurate inputs in a simulation is tough. However, by a combination of causality analysis,
+entropy (noise) generators, and symbolic growth modelling, we can create a feedback loop architecture built
+on top of the variables that we can confidently predict through lagged features. The explained workflow is currently 
+under development and needs extensive testing/optimizations given the significant amount of symbolic searches
+and statistical tests required in the feedback logic. Currently, `macrosim.GrowthDetector` uses a unary curve fitting
+algorithm to classify the growth patterns of variables and optimize parameters to reflect the line of best fit. 
+Predictably, unary functions are not great at modelling the growth of economic variables and this logic was implemented
+as a proof of concept in early stages of development.
 
-Taking the DAD-DAS model; we'll encounter a parameter of expected inflation which is often defined as: $ E[\pi_{t+1}] = \Theta(\pi_t) $. This definition may feel vague and undescriptive, the only information we are given is that there is some estiamtor $\Theta$ which (we assume) can perfectly estimate the expected inflation. This $\Theta$ is likely to vary depending on current economic state, time period, shocks, development levels, etc. and any sort of reliance to the DAD-DAS model requires some $\Theta$ to be derived from the ground up for each specific situation.
+## Example Usage
+Production function modelling (I believe) can be one of the most common use cases for MacroSim, and it will be the 
+example of choice here.  Let's assume we're looking into modelling real GDP as a function of:
 
-Symbolic regression coupled with a simulation engine can greatly reduce the human effort necessary to derive $\Theta$ in this example. By defining key variables, (for example: $\Delta_{CPI}$, $\Delta_{\frac{B}{Y}}$, $r$, $u$, etc.) collecting historical data, and fitting a symbolic regressor after cleaning the data. This approach is designed to maximize the control over how a symbolic representation (aka. function) should be derived. Size, complexity, allowed expression, elementwise loss, and many more parameters can be adjusted to derive best equation to model the target variable withind the given constraints. Of course, this is most often used to achieve interpretability; with the additional benefit of creating an opportunity to mathematically explore how predictions for a given variable are generated.
+- Labor Participation Rate
+- Capital Investment
+- Net Exports
+- CPI
+- Population Growth
+- Real Wage
 
-## Symbolic Regression Example
+### Data Retrieval
+The first step would be to retrieve data for the above-mentioned metrics from FRED using `macrosim.SeriesAccessor`.
+```python
+from macrosim.SeriesAccessor import SeriesAccessor
+import datetime as dt
 
-The symbolic regression backend of `MacroSim` relies on the `PySR` library which provides a symbolic regressor written in julia (a compiled language) and a python interface. The `macrosim.EqSearch` is a class that takes the `pysr.PySRRegressor` as its base and extends it by including model distillation and LOF outlier detection features. (Reasons behind opting for distillation and LOF based outlier removal are discussed further below)
+fred = SeriesAccessor(
+    key_path='../fred_key.env',
+    key_name='FRED_KEY'
+)
 
-We will demonstrate `EqSearch` by creating a fairly complex, yet mathematically accurate representation of the variable $L$ of the Cobb-Douglas production function. Data preparation steps are not included in this document, however all of the features, macroeconomic variables that are well-tracked my central banks and national statistic departments.
+start = dt.datetime.fromisoformat('2002-01-01')
+end = dt.datetime.fromisoformat('2024-01-01')
 
-### Feature Set
+df = fred.get_series(
+    series_ids = ['NETEXP', 'CIVPART', 'CORESTICKM159SFRBATL', 'LES1252881600Q', 'SPPOPGROWUSA', 'A264RX1A020NBEA', 'GDPC1'],
+    series_alias=[None, None, 'CPI', 'RWAGE', 'POPGROWTH', 'I_C', 'RGDP'],
+    reindex_freq='QS',
+    date_range=(start, end),   
+)
+```
+`reindex_freq='QS'` reformats all data to quarterly frequency, introducing `NaN` values if the original series is 
+updated less frequently. The reindexing operation matches the frequency of all variables to the target. (being real GDP)
+We can deal with the `NaN` values, again, using `macrosim.SeriesAccessor`.
+```python
+df = fred.fill(
+    data=df,
+    methods=[None, None, None, None, 'ffill', 'divide', None]
+)
+```
+In the example, only 2 of the series had data that's less frequent than quarterly. Here, the elected built-in fill 
+methods are specified in string literals. (refer to [MacroSim Docs](https://gongjr0.github.io/MacroSim/) for detailed information)
+We now have a dataset free of `NaN`s and ready for symbolic regression
 
-* $N := \text{Total Population}$
-* $n_{>65} := \text{Post-Labor Population (Age>65)}$
-* $n_{<15} := \text{Pre-Labor Population}$
-* $n_L := \text{Labor Force}$
-* $\gamma := \text{Labor Force Participation Rate}$
+### Symbolic Regression
+The symbolic regression backend of `MacroSim` relies on the `PySR` library which provides a regressor written 
+in julia, (a compiled language) and a python interface. `macrosim.EqSearch` is a class that takes the 
+`pysr.PySRRegressor` as its base and extends it by including model distillation and LOF outlier detection features.
+(Reasons behind opting for distillation and LOF based outlier removal are discussed further below)
 
-### Target Variable
+Having our dataset, we can conduct a symbolic search to derive the most accurate representation of real GDP within the
+constraints that we define.
 
-* $H_L := \text{Hours of Labor} $
+```python
+from macrosim.EqSearch import EqSearch
 
-A common common real-world definition of $L$ as a function is $L(H_L, w_h) = H_L \cdot w_h$ where $w_h$ represents the average (or median) hourly wage. You'll most likely notice that hours of total labor is a metric that is often recorded, tehrefore you might question reasoning behing endogenizing this variable. However, in a scenario where we're planning to extrapolate over a period of 20-50 year, an extremely accurate model of income generated through population is necessary. Raw demographic metrics can be modelled much more accurately through conventional practices and ML. Therefore, by having demographic metrics create the exogenous framework, we're essentially attempting to reorganize the CD parameters into a more simulation-friendly format.
+eqsr = EqSearch(
+    X= df.drop('RGDP', axis=1),
+    y= df['RGDP']
+)
+eqsr.distil_split()
+eqsr.search()
+
+eq = eqsr.eq
+```
+`EqSearch.distil_split` was called to filter out the outliers with LOF and distil the target variable through a Random
+Forest regressor. The aggressive outlier handling implemented ensures that the symbolic regression will target a more
+general scope instead of attempting to predict shocks at fit time. The following call to `EqSearch.search` initiates the
+symbolic regression; no constraints were defined here, but you can refer to the [documentation](https://gongjr0.github.io/MacroSim/) for a detailed 
+explanation of how to set them. We now have the core component for our simulation engine, the main equation that will be
+responsible for mapping our inputs to outputs. However, we are yet to explore the growth patterns of our input variables.
+We need to define functions that will govern how our inputs evolve over $n$ steps of simulation.
+
+### Input Growth Modelling [Proof of Concept!!]
+`macrosim.GrowthDetector` is responsible for deriving growth functions for each input variable. Using the historical 
+data we have, pre-defined parametrized growth functions are fitted to the data and the best fitting functions are 
+selected for each variable on the basis of MSE.
+```python
+from macrosim.GrowthDetector import GrowthDetector
+
+gd = GrowthDetector()
+opt = gd.find_opt_growth(df.drop('RGDP', axis=1))
+print(opt)
+```
+```pycon
+>>> {'NETEXP': (Logarithmic(x, 579.61, 0.0, 1.0, 170.21), MSE = 20050.11),
+ 'CIVPART': (Linear(x, -0.06), MSE = 0.38),
+ 'CPI': (Logarithmic(x, 1.85, 1.13, 1.0, 0.03), MSE = 1.22),
+ 'RWAGE': (Exponential(x, 1.0, 0.0), MSE = 119.37),
+ 'POPGROWTH': (Exponential(x, 1.02, -0.02), MSE = 0.02),
+ 'I_C': (Exponential(x, 1.02, -1.46), MSE = 409.61)}
+```
+We can see that `GrowthDetector.find_opt_growth` returns a dictionary of tuples. Index 0 of the tuples contain a function
+with a custom `__repr__` method to signify the nature and parameters of the function that best describes the growth of said
+variable. Index 1 contains the MSE value (`np.float64`) obtained at fit time. (again, with a formatted `__repr__` 
+method) This gives us all we need to initiate the simulation.
+
+### Simulating the derived scenario
+The simulation engine is built as a non-exhaustible generator that will recursively apply the growth functions and derive
+an output using the symbolic regression result.
+
+```python
+from macrosim.SimEngine import SimEngine
+
+initial_params = {
+    col: (df[col].iloc[0], opt[col][0]) for col in df.columns[:-1]
+}
+
+engine = SimEngine(
+    eq=eq,
+    init_params=initial_params,
+    deterministic=True,
+    entropy_coef=0.01
+)
+
+for _ in range(50):
+    next(engine._simulate())
+
+output_df = engine.get_history()
+```
+As the first step, we defined the initial values and growth functions that will govern them as a tuple for each column. 
+will be inputted to the generator logic. We used the first index of our historical data (the most recent observations) to
+be able to compare our results with the real observations. (We could've used the most recent observations to simulate
+future periods.) Then, an instance of `macrosim.SimEngine` was declared with the necessary parameters. The chosen
+entropy coefficient was 0.01 (this value defines the average extent of noise as a percentage of the variables) so we 
+expect to see shocks (noise) that's 1% of the values computed by the growth functions in both positive and negative 
+directions. Using `entropy_coef=0` will completely disable the noise and will allow a clean inspection of growth function
+behavior.
+
 
 ### A Peak at the Results
 
-To demostrate the outcome of the above describled experiment, we've defined a ran a regression process, converting all features to monthly frequencies, assuming unform distribution of quartlerly and annual variables over months. (This was done to artifically increase the dataset size without including pre-milenium data) To account for the high likelihood of overfitting due to perfectly unfiorm data distribution, a random normal noise factor, $\epsilon \sim N(0, \, 0.003 \cdot X_n)$ was added to each observation of the features that were subject to said frequency normalization. The outcome was a rather complex (the regression was run without complexity limitations), yet accurate expression:
-
-$$
-H_L(N, \ n_{>65},\ n_{<15},\ n_L,\ \gamma) = \gamma \cdot(sin(\gamma +0.27)cos(\gamma^{0.85})-2.40)\cdot(cos(0.01\sqrt{N})-2.73sin(\gamma)^2+26.27)+7.63e-5*N)
-$$
-
-Looking at the outcome, a valuable observation is that $n_{<15}$ and $n_{>65}$ were not used in the final expression. It is important to note that, `PySR` is designed to consider the simplicity of expressions and in case of equivalent accuracies, will select the equation with less parameters. Here we can reason about how $\gamma$ and $N$ were enough to derive a highly accurate output. Due to the seasonality and relative stability of the average hours worked per worker, knowing the population of labor force and their rate of particiaption accounts for all but one considerations; being seasonality. You'll notice an abundance of trigonometric functions, due to their cyclical behavior, these functions are the perfect candidate for modelling seasonality.
-
-As you can see, we were able to extensively analyse and reason about the model output, which is simply not possible to this extent. (in non-linear cases) Moreover, we did not sacrifie a great deal of accuracy, as seen in the plot below, the model captured a good balance of sensitivity and generalization. (note that outliers were removed in training)
+By plotting the simulated data against the real observations, we can check the performance. Due to insufficient accuracy
+of growth functions (for now) accurate results are not expected. Plotting the simulation confirms this:
 
 <p align="center">
-  <img src="assets/LAB_HOURS_symbolic_pred.png" alt="Symbolic Regression Predictions for Total Hours of Labor">
+  <img src="./assets/sim_res.png" alt="Simulation Results"></img>
 </p>
 
-### Generating Symbolic Expressions
+We can see that the results were relatively accurate until the 2008 crisis. (it honestly performed better than I expected)
+The growth functions are called recursively, and we used a minimal amount of randomized entropy. This meant that we didn't
+stand a chance against a massive shock. The engine simply preserved the expected state as defined by the symbolic 
+expressions.
 
-Excluding data preprocessing, symbolic expressions can be generated through two method calls to an `EqSearch` instance. On the backend, `EqSearch` will remove local ouliers with a default contamination rate of $2.5\%$ and $n_{neighbors}=\lfloor n_{df}^{0.5}\rfloor$. Afterwards, a `sklearn.RandomForestRegressor` will be trained on the data and create predictions for the entire dataset. This step makes use of the robustness (aka. insensitivity to outliers) of the RandomForest algorithm to further distil the original labels. Through completing these steps, we aim to reach at a dataset where the features correspond to generalized labels instead of exact outcomes which generally increases the success rate of symbollic regression.
-
-Knowing that the outcomes of symbolic regression (from PySR) are continuous and cannot be piecewise defined, you can imagine how attempting to fit to an ungeneralized set might turn out; therefore the safer approach of model distillation was picked as a design choice. This is the only additional functionality of `EqSearch` that builds on top of the regression model, therefore users who wish to opt out of distillation can directly utilise PySR and use the output in their simulations through `MacroSim`.
-
-Regression outputs are generated with the code:
-
-```python
-from macrosim import EqSearch
-import pandas as pd
-from sympy import sin, cos
-
-df = pd.read_csv(...)
-
-#Prepare Data
-...
-
-X=df.drop('target', axis=1)
-y=df['target'].to_frame()
-
-eqsr = EqSearch(X=x, y=y)
-
-eqsr.distil_split(grid_search=False)  # To enable gridsearch for RandomForest, pass grid_search=True and param_grid={...}
-
-eqsr.search(custom_loss='L2DistLoss()',  # You can refer to PySR docs for predefined loss functions or define a custom 
-                                         # function as a string using julia syntax
-
-            extra_unary_ops={  # There are default lists of binary and unary operations, you cannot add custom binary operations but you can choose which 
-                               # operations to allow, You can add unary operations using the format below.
-                'cos2': {
-                    'julia': 'cos2(x)=cos(x)^2',
-                    'sympy': lambda x: cos(x) ** 2
-                },
-                'sin2': {
-                    'julia': 'sin2(x)=sin(x)^2',
-                    'sympy': lambda x: sin(x) ** 2
-                }
-            })
-
-print(eqsr.eq)  # 'eq' will contain the most accurate equation once EqSearch.search is called. Call EqSearch.sr._equations to get a 
-                # DataFrame representing the whole search space.
-
-
-```
+## Comments
+As seen in the example, the current state of MacroSim is not well suited for stochastic shocks. After the implementation
+of more advanced growth modelling techniques, this issue will also be addressed. The current example showed that a 
+symbolic regression and simulation pipeline has the power to (at the very least) preserve the state of an economy over time.
+As improvements and additions are implemented, MacroSim can become a gateway to utilise a regression model that was built
+for natural sciences and take it to the realm of economic simulation.
