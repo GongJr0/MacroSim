@@ -86,13 +86,12 @@ class SeriesAccessor:
     def _fill_equal(series: pd.Series) -> pd.Series:
         mask = series.isna()
         cumsum = (~mask).cumsum()
-        count_per_group = mask.groupby(cumsum).transform('count')  # Count NaNs before each value
 
-        # Divide known value equally among NaNs + itself
-        filled_values = series.ffill() / (count_per_group + 1)
+        count_per_group = mask.groupby(cumsum).transform('count') + 1
 
-        # Preserve index and replace only NaN values
-        return series.where(~mask, filled_values)
+        filled_values = series.ffill() / count_per_group
+
+        return filled_values
 
     @staticmethod
     def _bfill(series: pd.Series) -> pd.Series:
