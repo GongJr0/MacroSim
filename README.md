@@ -111,7 +111,7 @@ gd = GrowthDetector()
 opt = gd.find_opt_growth(df.drop('RGDP', axis=1))
 print(opt)
 ```
-```pycon
+```
 >>> {'NETEXP': (Logarithmic(x, 579.61, 0.0, 1.0, 170.21), MSE = 20050.11),
  'CIVPART': (Linear(x, -0.06), MSE = 0.38),
  'CPI': (Logarithmic(x, 1.85, 1.13, 1.0, 0.03), MSE = 1.22),
