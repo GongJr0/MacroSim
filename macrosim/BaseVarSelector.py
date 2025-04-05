@@ -15,7 +15,16 @@ class BaseVarSelector:
         self.df = df
         self.score_dict: dict[str, Any] = {k: {} for k in self.df.columns}
 
-    def granger_matrix(self):
+    def granger_score(self, G_matrix):
+        outgoing = G_matrix.sum(axis=1)
+        incoming = G_matrix.sum(axis=0)
+
+        scores: pd.Series = (outgoing - incoming).round(4)
+        ranks = scores.rank(ascending=True).astype(int)
+        for col in G_matrix.columns:
+            self.score_dict[col]['Granger'] = ranks[col]
+
+    def granger_matrix(self, score=True):
         var_names = self.df.columns.tolist()
         n = len(var_names)
         G = pd.DataFrame(np.zeros((n, n)), index=var_names, columns=var_names)
@@ -31,23 +40,25 @@ class BaseVarSelector:
                 p_val = [test_res[lag][0]['ssr_chi2test'][1] for lag in test_res]
                 G.iloc[i, j] = min(p_val)
 
+        if score:
+            self.granger_score(G_matrix=G)
+
         return G
 
-    def granger_score(self, G_matrix):
-        outgoing = G_matrix.sum(axis=1)
-        incoming = G_matrix.sum(axis=0)
-
-        scores: pd.Series = (outgoing - incoming).round(4)
-        ranks = scores.rank(ascending=True).astype(int)
-        for col in G_matrix.columns:
-            self.score_dict[col]['Granger'] = ranks[col]
 
     def multivar_granger_matrix(self):
         var_names = self.df.columns.tolist()
         scores = {var: [] for var in var_names}
         maxlag = int(np.floor(np.sqrt(len(self.df))))
 
+        corr = self.df.corr(method='pearson').abs()
+        avg_corr = corr.apply(lambda row: row.drop(row.name).mean(), axis=1)
+        threshold = corr.where(~np.eye(len(corr), dtype=bool)).stack().quantile(0.90)
+
         for predictors in combinations(var_names, 2):
+            if corr.loc[*predictors] >= threshold:
+                continue
+
             targets = [v for v in var_names if v not in predictors]
 
             for target in targets:
@@ -86,8 +97,8 @@ class BaseVarSelector:
                     p_value = 1 - f.cdf(f_stat, df_diff, n_obs - full_fit.df_model)
 
                     # Assign p-value to both predictors
-                    scores[predictors[0]].append(p_value)
-                    scores[predictors[1]].append(p_value)
+                    scores[predictors[0]].append(p_value * (1+avg_corr[predictors[0]]))
+                    scores[predictors[1]].append(p_value * (1+avg_corr[predictors[1]]))
 
                 except (ValueError, MissingDataError, np.linalg.LinAlgError) as e:
                     print(f"Skipped {predictors} → {target} due to error: {e}")
