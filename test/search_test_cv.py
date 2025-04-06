@@ -1,10 +1,10 @@
+from macrosim.SimEngine import SimEngine
+from macrosim.EqSearch import EqSearch
+from macrosim.GrowthDetector import GrowthDetector
 from macrosim.SeriesAccessor import SeriesAccessor
-from macrosim.BaseVarSelector import BaseVarSelector
-from macrosim.BaseVarModel import BaseVarModel
 
-import pandas as pd
-import numpy as np
 import datetime as dt
+import matplotlib.pyplot as plt
 
 fred = SeriesAccessor(
     key_path='../fred_key.env',
@@ -19,17 +19,25 @@ df = fred.get_series(
     series_alias=[None, None, 'CPI', 'RWAGE', 'POPGROWTH', 'I_C', 'RGDP'],
     reindex_freq='QS',
     date_range=(start, end),
-
+    
 )
 df = fred.fill(
     data=df,
     methods=[None, None, None, None, 'ffill', 'divide', None]
 )
 
+gd = GrowthDetector()
+opt = gd.find_opt_growth(df)
 
-bvm = BaseVarModel(df=df)
-candidates = bvm.get_base_candidates()
+eqsr = EqSearch(
+    X= df.drop('RGDP', axis=1),
+    y= df['RGDP']
+)
+eqsr.distil_split()
+eqsr.search(
+    niterations=100,
+    progress=True
+)
 
-bvm.symbolic_model(candidate=candidates['POPGROWTH'], progress=True, niterations=100, constraints={'atan': 2})
-if bvm.model_select() == bvm.sr:
-    print(bvm.sr.get_best())
+eq = eqsr.eq
+print(eq.get_best())
