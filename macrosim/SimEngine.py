@@ -97,3 +97,9 @@ class SimEngine:
         df = pd.read_csv(StringIO("\n".join(self._hist)), low_memory=False)
         df.index.name = 'step'
         return df
+
+    def simulate(self, steps: int) -> pd.DataFrame:
+        for _ in range(steps):
+            next(self._simulate())
+
+        return self.get_history()
