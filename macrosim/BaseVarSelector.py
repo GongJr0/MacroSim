@@ -45,7 +45,6 @@ class BaseVarSelector:
 
         return G
 
-
     def multivar_granger_matrix(self):
         var_names = self.df.columns.tolist()
         scores = {var: [] for var in var_names}

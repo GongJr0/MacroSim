@@ -4,8 +4,9 @@ from jedi.inference.gradual.typing import Callable
 from pysr import PySRRegressor
 
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import GridSearchCV
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 
 from sklearn.neighbors import LocalOutlierFactor
 
@@ -39,8 +40,6 @@ class EqSearch:
         self.y = pd.DataFrame(y)
 
         self.random_state = random_state
-
-        self.model = PySRRegressor()
 
         self.distilled = None
 
@@ -76,7 +75,7 @@ class EqSearch:
         else:
             rf.fit(X_train, y_train.values.ravel())
 
-        print(f"RandomForest Score at Distillation: {rf.score(X_test, y_test)}")
+        print(f"RandomForest Score at Distillation: {rf.score(X_test, y_test):.3f}")
 
         distilled_y = rf.predict(self.X)
 
@@ -95,32 +94,46 @@ class EqSearch:
             constraints = {}
 
         assert self.distilled.shape == self.y.shape, "Run self.distil_split() before symbolizing."
-        sr = self.sr
+
         extra_unary = self.extra_unary | extra_unary_ops
 
         binary_ops = list(binary_ops)
         unary_ops = list(unary_ops)
 
-        sr.set_params(
-            model_selection='accuracy',  # type:ignore # Do not consider complexity at selection
+        kf = KFold(n_splits=5, shuffle=True, random_state=self.random_state)
 
-            maxsize=kwargs.get('maxsize', 32),  # type:ignore
-            niterations=kwargs.get('niterations', 300),  # type:ignore
+        folds = []
+        for fold, (train_idx, val_idx) in enumerate(kf.split(self.X)):
+            X_train, X_val = self.X.iloc[train_idx], self.X.iloc[val_idx]
+            y_train, y_val = self.y.iloc[train_idx], self.y.iloc[val_idx]
 
-            binary_operators=binary_ops,  # type:ignore
-            unary_operators=[*unary_ops, *[x['julia'] for x in extra_unary.values()]],  # type:ignore
-            extra_sympy_mappings={x[0]: x[1]['sympy'] for x in extra_unary.items()},  # type:ignore
+            curr_sr = PySRRegressor(
+                model_selection='accuracy',  # type:ignore # Do not consider complexity at selection
 
-            elementwise_loss=custom_loss if custom_loss else 'L2DistLoss()',  # type:ignore
+                maxsize=kwargs.get('maxsize', 32),  # type:ignore
+                niterations=kwargs.get('niterations', 300),  # type:ignore
 
-            constraints={'^': (-1, 1)} | constraints,  # type:ignore
+                binary_operators=binary_ops,  # type:ignore
+                unary_operators=[*unary_ops, *[x['julia'] for x in extra_unary.values()]],  # type:ignore
+                extra_sympy_mappings={x[0]: x[1]['sympy'] for x in extra_unary.items()},  # type:ignore
 
-            verbosity=kwargs.get('verbosity', 1),  # type:ignore
-            progress=kwargs.get('progress', False),  # type:ignore
-            temp_equation_file=kwargs.get('temp_equation_file', True),  # type:ignore
-            random_state=self.random_state,  # type:ignore
-            deterministic=True,  # type:ignore
-            parallelism='serial'  # type:ignore
-        )
-        sr.fit(self.X, self.distilled)
+                elementwise_loss=custom_loss if custom_loss else 'L2DistLoss()',  # type:ignore
+
+                constraints={'^': (-1, 1)} | constraints,  # type:ignore
+
+                verbosity=kwargs.get('verbosity', 1),  # type:ignore
+                progress=kwargs.get('progress', False),  # type:ignore
+                temp_equation_file=kwargs.get('temp_equation_file', True),  # type:ignore
+                random_state=self.random_state,  # type:ignore
+                deterministic=True,  # type:ignore
+                parallelism='serial'  # type:ignore
+            )
+
+            curr_sr.fit(X_train, y_train)
+            fold_mse = mean_squared_error(curr_sr.predict(X_val), y_val)
+            folds.append((curr_sr, fold_mse))
+
+        sr = sorted(folds, key=lambda x: x[1])[0][0]
+
+        self.sr = sr
         self.eq: Callable = sr.get_best()['sympy_format']
