@@ -55,6 +55,10 @@
 </li>
                                     
 <li>
+    <a href="../BaseVarSelector/" class="dropdown-item">BaseVarSelector</a>
+</li>
+                                    
+<li>
     <a href="../SimEngine/" class="dropdown-item">SimEngine</a>
 </li>
                                 </ul>
@@ -152,28 +156,38 @@ df = fred.fill(
 <p><code>SeriesAccessor</code> includes two user-facing methods and it's only functionality is to retrieve and format series from FRED.</p>
 <h3 id="seriesaccessorget_series"><code>SeriesAccessor.get_series</code></h3>
 <p>Retrieves the specified FRED series and applies the specified formatting.</p>
-<p><strong>Params:</strong>
-- <code>series_ids: Sequence[str]</code>: List of FRED series IDs to retireve
-- <code>date_range: tuple(dt.datetime.date, dt.datetime.date)</code>: Date interval to retrieve data for.
-- <code>reindex_freq: str</code>: String literal of the observation frequency to reformat the series
-- <code>series_alias: Sequence[str]</code>: List of aliases to use as column names in the outputted dataframe. <code>EqSearch</code>
-will use these as the variable names when outputting symbolic equations.</p>
-<p><strong>Returns:</strong>
-- <code>pd.DataFrame</code>: Concatenated and re-indexed dataframe of the series specified</p>
+<p><strong>Params:</strong></p>
+<ul>
+<li><code>series_ids: Sequence[str]</code>: List of FRED series IDs to retireve</li>
+<li><code>date_range: tuple(dt.datetime.date, dt.datetime.date)</code>: Date interval to retrieve data for.</li>
+<li><code>reindex_freq: str</code>: String literal of the observation frequency to reformat the series</li>
+<li><code>series_alias: Sequence[str]</code>: List of aliases to use as column names in the outputted dataframe. <code>EqSearch</code>
+will use these as the variable names when outputting symbolic equations.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<ul>
+<li><code>pd.DataFrame</code>: Concatenated and re-indexed dataframe of the series specified</li>
+</ul>
 <h3 id="seriesaccessorfill"><code>SeriesAccessor.fill</code></h3>
 <p>Fills the given data with specified fill methods.</p>
-<p><strong>Params:</strong>
-- <code>df: pd.DataFrame</code>: DataFrame object to apply the fill methods
-- <code>fill_methods</code>: a list of fill methods for each column in the dataframe. The default behavior is to fill the list with
+<p><strong>Params:</strong></p>
+<ul>
+<li><code>df: pd.DataFrame</code>: DataFrame object to apply the fill methods</li>
+<li><code>fill_methods</code>: a list of fill methods for each column in the dataframe. The default behavior is to fill the list with
 <code>None</code>s until the amount of methods match the mount of columns in the data. The methods can be a unary lambda function, or
-one of the built-in fill methods passed as a string. The available methods are:
-  - <code>ffill</code>: forward-fill, behaves exactly same as <code>pd.Series.ffill</code>.
-  - <code>bfill</code>: backward-fill, behaves exactly same as <code>pd.Series.bfill</code>.
-  - <code>divide</code>: Divide the last known value equally to <span class="arithmatex">\(n\)</span> NaN values encountered before the next available row.
-  For example, this can be used to evenly split yearly data to a monthly or quarterly observation frequency.
-  - <code>mean</code>: Use the mean to fill NaNs.
-  - <code>median</code>: Use the median to fill NaNs.
-  - <code>IQR_mean</code>: Use the mean calculated from data within the IQR to fill NaNs.</p></div>
+one of the built-in fill methods passed as a string. The available methods are:</li>
+<li><code>ffill</code>: forward-fill, behaves exactly same as <code>pd.Series.ffill</code>.</li>
+<li><code>bfill</code>: backward-fill, behaves exactly same as <code>pd.Series.bfill</code>.</li>
+<li><code>divide</code>: Divide the last known value equally to <span class="arithmatex">\(n\)</span> NaN values encountered before the next available row.
+  For example, this can be used to evenly split yearly data to a monthly or quarterly observation frequency.</li>
+<li><code>mean</code>: Use the mean to fill NaNs.</li>
+<li><code>median</code>: Use the median to fill NaNs.</li>
+<li><code>IQR_mean</code>: Use the mean calculated from data within the IQR to fill NaNs.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<ul>
+<li><code>pd.DataFrame</code>: Dataframe with <code>NaN</code> values filled.</li>
+</ul></div>
             </div>
         </div>
 
