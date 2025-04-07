@@ -130,10 +130,18 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="macrosim-documentation">MacroSim Documentation</h1>
-<p>MacroSim is a python library aimed at creating symbloic models of economic variables thgough PySR's <code>PySRRegressor</code>. It utilizes a FRED series accessor and a cunstomizable equation search engine to find an accurate smybolic representation of the selected variavle using the features retrieved from FRED series. MacroSim contains a simulation engine that has the capability to extrapolate the given data points using fully symbolic, per-variable growth rate equations.</p>
-<p>MacroSim's main focus is not on producing the most accurate output, but to ensure explorability of outputs for research purposes. Both the symbolic regression results and the fitted growth equations prioritize interpretability. Although kinks are often produced in the output extrapolation process, the equations themselves are configured to be differenciable in most cases.</p>
+<p>MacroSim is a python library aimed at creating symbloic models of economic variables thgough PySR's 
+<code>PySRRegressor</code>. It utilizes a FRED series accessor and a cunstomizable equation search engine to find an accurate 
+smybolic representation of the selected variavle using the features retrieved from FRED series. MacroSim contains a 
+simulation engine that has the capability to extrapolate the given data points using fully symbolic, per-variable growth 
+rate equations.</p>
+<p>MacroSim's main focus is not on producing the most accurate output, but to ensure explorability of outputs for research 
+purposes. Both the symbolic regression results and the fitted growth equations prioritize interpretability. Although 
+kinks are often produced in the output extrapolation process, the equations themselves are configured to be differenciable 
+in most cases.</p>
 <h2 id="installation">Installation</h2>
-<p>MacroSim can be intalled throuh <code>pip</code>; and the builds are available in the github repo if you prefer to install it manually. The pip command required to retireve MacroSim is:</p>
+<p>MacroSim can be installed through <code>pip</code>; and the builds are available in the github repo if you prefer to install it 
+manually. The pip command required to retireve MacroSim is:</p>
 <pre><code class="language-bash">python -m pip install macrosim
 </code></pre>
 <h2 id="example-usage">Example Usage</h2>
@@ -199,10 +207,10 @@ eq = eqsr.eq
 <p><code>EqSearch.distil_split</code> was called to filter out the outliers with LOF and distil the target variable through a Random
 Forest regressor. The aggressive outlier handling implemented ensures that the symbolic regression will target a more
 general scope instead of attempting to predict shocks at fit time. The following call to <code>EqSearch.search</code> initiates the
-symbolic regression; no constraints were defined here, but you can refer to the <a href="https://gongjr0.github.io/MacroSim/">documentation</a> for a detailed 
-explanation of how to set them. We now have the core component for our simulation engine, the main equation that will be
-responsible for mapping our inputs to outputs. However, we are yet to explore the growth patterns of our input variables.
-We need to define functions that will govern how our inputs evolve over <span class="arithmatex">\(n\)</span> steps of simulation.</p>
+symbolic regression; no constraints were defined here, but you can refer to the <a href="https://gongjr0.github.io/MacroSim/">documentation</a> 
+for a detailed explanation of how to set them. We now have the core component for our simulation engine, the main 
+equation that will be responsible for mapping our inputs to outputs. However, we are yet to explore the growth patterns 
+of our input variables. We need to define functions that will govern how our inputs evolve over <span class="arithmatex">\(n\)</span> steps of simulation.</p>
 <h3 id="input-growth-modelling-proof-of-concept">Input Growth Modelling [Proof of Concept!!]</h3>
 <p><code>macrosim.GrowthDetector</code> is responsible for deriving growth functions for each input variable. Using the historical 
 data we have, pre-defined parametrized growth functions are fitted to the data and the best fitting functions are 
@@ -364,5 +372,5 @@ for natural sciences and take it to the realm of economic simulation.</p></div>
 
 <!--
 MkDocs version : 1.6.1
-Build Date UTC : 2025-04-07 23:55:00.852396+00:00
+Build Date UTC : 2025-04-07 23:58:19.489594+00:00
 -->
