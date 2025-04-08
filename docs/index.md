@@ -36,7 +36,7 @@ example of choice here.  Let's assume we're looking into modelling real GDP as a
 ### Data Retrieval
 The first step would be to retrieve data for the above-mentioned metrics from FRED using `macrosim.SeriesAccessor`.
 ```python
-from macrosim.SeriesAccessor import SeriesAccessor
+from macrosim import SeriesAccessor
 import datetime as dt
 
 fred = SeriesAccessor(
@@ -101,13 +101,13 @@ of our input variables. We need to define functions that will govern how our inp
 data we have, pre-defined parametrized growth functions are fitted to the data and the best fitting functions are 
 selected for each variable on the basis of MSE.
 ```python
-from macrosim.GrowthDetector import GrowthDetector
+from macrosim import GrowthDetector
 
 gd = GrowthDetector()
 opt = gd.find_opt_growth(df.drop('RGDP', axis=1))
 print(opt)
 ```
-```
+```text
 >>> {'NETEXP': (Logarithmic(x, 579.61, 0.0, 1.0, 170.21), MSE = 20050.11),
  'CIVPART': (Linear(x, -0.06), MSE = 0.38),
  'CPI': (Logarithmic(x, 1.85, 1.13, 1.0, 0.03), MSE = 1.22),
@@ -125,7 +125,7 @@ The simulation engine is built as a non-exhaustible generator that will recursiv
 an output using the symbolic regression result.
 
 ```python
-from macrosim.SimEngine import SimEngine
+from macrosim import SimEngine
 
 initial_params = {
     col: (df[col].iloc[0], opt[col][0]) for col in df.columns[:-1]
