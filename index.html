@@ -8,7 +8,7 @@
         <meta name="author" content="Ege Güney Kıymaç">
         
         <link rel="shortcut icon" href="img/favicon.ico">
-        <title>MacroSim Docs</title>
+        <title>MacroSim</title>
         <link href="css/bootstrap.min.css" rel="stylesheet">
         <link href="css/fontawesome.min.css" rel="stylesheet">
         <link href="css/brands.min.css" rel="stylesheet">
@@ -25,7 +25,7 @@
     <body class="homepage">
         <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
             <div class="container">
-                <a class="navbar-brand" href=".">MacroSim Docs</a>
+                <a class="navbar-brand" href=".">MacroSim</a>
                 <!-- Expander button -->
                 <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -191,7 +191,7 @@ example of choice here.  Let's assume we're looking into modelling real GDP as a
 </ul>
 <h3 id="data-retrieval">Data Retrieval</h3>
 <p>The first step would be to retrieve data for the above-mentioned metrics from FRED using <code>macrosim.SeriesAccessor</code>.</p>
-<pre><code class="language-python">from macrosim.SeriesAccessor import SeriesAccessor
+<pre><code class="language-python">from macrosim import SeriesAccessor
 import datetime as dt
 
 fred = SeriesAccessor(
@@ -249,13 +249,13 @@ of our input variables. We need to define functions that will govern how our inp
 <p><code>macrosim.GrowthDetector</code> is responsible for deriving growth functions for each input variable. Using the historical 
 data we have, pre-defined parametrized growth functions are fitted to the data and the best fitting functions are 
 selected for each variable on the basis of MSE.</p>
-<pre><code class="language-python">from macrosim.GrowthDetector import GrowthDetector
+<pre><code class="language-python">from macrosim import GrowthDetector
 
 gd = GrowthDetector()
 opt = gd.find_opt_growth(df.drop('RGDP', axis=1))
 print(opt)
 </code></pre>
-<pre><code>&gt;&gt;&gt; {'NETEXP': (Logarithmic(x, 579.61, 0.0, 1.0, 170.21), MSE = 20050.11),
+<pre><code class="language-text">&gt;&gt;&gt; {'NETEXP': (Logarithmic(x, 579.61, 0.0, 1.0, 170.21), MSE = 20050.11),
  'CIVPART': (Linear(x, -0.06), MSE = 0.38),
  'CPI': (Logarithmic(x, 1.85, 1.13, 1.0, 0.03), MSE = 1.22),
  'RWAGE': (Exponential(x, 1.0, 0.0), MSE = 119.37),
@@ -269,7 +269,7 @@ method) This gives us all we need to initiate the simulation.</p>
 <h3 id="simulating-the-derived-scenario">Simulating the derived scenario</h3>
 <p>The simulation engine is built as a non-exhaustible generator that will recursively apply the growth functions and derive
 an output using the symbolic regression result.</p>
-<pre><code class="language-python">from macrosim.SimEngine import SimEngine
+<pre><code class="language-python">from macrosim import SimEngine
 
 initial_params = {
     col: (df[col].iloc[0], opt[col][0]) for col in df.columns[:-1]
@@ -396,5 +396,5 @@ for natural sciences and take it to the realm of economic simulation.</p></div>
 
 <!--
 MkDocs version : 1.6.1
-Build Date UTC : 2025-04-08 02:01:31.802543+00:00
+Build Date UTC : 2025-04-08 19:39:58.048826+00:00
 -->
