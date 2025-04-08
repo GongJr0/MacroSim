@@ -1,30 +1,26 @@
-# MacroSim
+# MacroSim Documentation
 
-MacroSim focuses on the derivation and iterative simulation of symbolic equations derived
-through PySR's symbolic regression. This approach allows exploratory modelling of economic 
-indicators/variables without the restriction of adapting to predefined models. With a heavy emphasis on
-mathematical interpretability, MacroSim is mainly geared towards research purposes. There's no question that
-a well-implemented predictive regression model can produce more accurate predictions of an economy; However, when it 
-comes to exploring new economic models MacroSim is much better suited in comparison. Using real-world data to tune a 
-symbolic model creates the benefits of:
-- Avoiding unrealistic assumptions (symbolic models based on real-world data do not require assumptions 
-such as information symmetry, efficient markets, perfectly open or closed economies, etc.)
-- Configurability of outputted expressions (The nature, complexity and constraints of equations are highly configurable)
-- Freedom of modelling any variable as a function of others
+MacroSim is a python library aimed at creating symbloic models of economic variables thgough PySR's 
+`PySRRegressor`. It utilizes a FRED series accessor and a cunstomizable equation search engine to find an accurate 
+smybolic representation of the selected variavle using the features retrieved from FRED series. MacroSim contains a 
+simulation engine that has the capability to extrapolate the given data points using fully symbolic, per-variable growth 
+rate equations.
 
-MacroSim, being a simulation engine at its core, cannot rely on historical data in its core logic. Thus, accurately 
-modelling the growth, combined causality, and the extent of entropy in input variables is a crucial step for 
-producing satisfactory results. Symbolic regression ultimately produces an equation that generates an accurate output 
-if and only if the input variables themselves are accurate.
 
-Fulfilling the requirement of accurate inputs in a simulation is tough. However, by a combination of causality analysis,
-entropy (noise) generators, and symbolic growth modelling, we can create a feedback loop architecture built
-on top of the variables that we can confidently predict through lagged features. The explained workflow is currently 
-under development and needs extensive testing/optimizations given the significant amount of symbolic searches
-and statistical tests required in the feedback logic. Currently, `macrosim.GrowthDetector` uses a unary curve fitting
-algorithm to classify the growth patterns of variables and optimize parameters to reflect the line of best fit. 
-Predictably, unary functions are not great at modelling the growth of economic variables and this logic was implemented
-as a proof of concept in early stages of development.
+MacroSim's main focus is not on producing the most accurate output, but to ensure explorability of outputs for research 
+purposes. Both the symbolic regression results and the fitted growth equations prioritize interpretability. Although 
+kinks are often produced in the output extrapolation process, the equations themselves are configured to be differenciable 
+in most cases.
+
+
+## Installation
+
+MacroSim can be installed through `pip`; and the builds are available in the github repo if you prefer to install it 
+manually. The pip command required to retireve MacroSim is:
+
+```bash
+python -m pip install macrosim
+```
 
 ## Example Usage
 Production function modelling (I believe) can be one of the most common use cases for MacroSim, and it will be the 
@@ -95,10 +91,10 @@ eq = eqsr.eq
 `EqSearch.distil_split` was called to filter out the outliers with LOF and distil the target variable through a Random
 Forest regressor. The aggressive outlier handling implemented ensures that the symbolic regression will target a more
 general scope instead of attempting to predict shocks at fit time. The following call to `EqSearch.search` initiates the
-symbolic regression; no constraints were defined here, but you can refer to the [documentation](https://gongjr0.github.io/MacroSim/) for a detailed 
-explanation of how to set them. We now have the core component for our simulation engine, the main equation that will be
-responsible for mapping our inputs to outputs. However, we are yet to explore the growth patterns of our input variables.
-We need to define functions that will govern how our inputs evolve over $n$ steps of simulation.
+symbolic regression; no constraints were defined here, but you can refer to the [documentation](https://gongjr0.github.io/MacroSim/) 
+for a detailed explanation of how to set them. We now have the core component for our simulation engine, the main 
+equation that will be responsible for mapping our inputs to outputs. However, we are yet to explore the growth patterns 
+of our input variables. We need to define functions that will govern how our inputs evolve over $n$ steps of simulation.
 
 ### Input Growth Modelling [Proof of Concept!!]
 `macrosim.GrowthDetector` is responsible for deriving growth functions for each input variable. Using the historical 
