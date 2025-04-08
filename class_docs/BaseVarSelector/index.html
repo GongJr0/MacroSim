@@ -133,10 +133,10 @@ and the other being a <strong>Multivariate GCT</strong>. Both tests are structur
 <span class="arithmatex">\(H_0: x \underset{\text{Granger-cause}}{\not\to} z\)</span> and <span class="arithmatex">\(H_\alpha: x\underset{\text{Granger-cause}}{\to} z\)</span>. As any classical
 hypothesis test, we check of the p-value of <span class="arithmatex">\(H_0\)</span>. Lower p-values indicate greater statistical evidence against <span class="arithmatex">\(H_0\)</span>, 
 suggesting that <strong>x Granger-causes z</strong>. Importantly, GCT checks for linear causality so the significance we're computing 
-is for the probability of a function existing such that:
-$$
+is for the probability of a function existing such that:</p>
+<div class="arithmatex">\[
 f(x_t, x_{t-1}, \dots, x_{t-n}) = z_t
-$$</p>
+\]</div>
 <div class="arithmatex">\[
 \text{and}
 \]</div>
@@ -209,8 +209,6 @@ variable ranks to <code>BaseVarSelector.score_dict</code>.</p>
         <script src="../../javascripts/katex.js"></script>
         <script src="https://unpkg.com/katex@0/dist/katex.min.js"></script>
         <script src="https://unpkg.com/katex@0/dist/contrib/auto-render.min.js"></script>
-        <script src="../../javascripts/mathjax.js"></script>
-        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
         <script src="../../search/main.js"></script>
 
         <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
