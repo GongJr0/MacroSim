@@ -130,20 +130,20 @@
 growth in the simulation process. It uses two implementations of <strong><em>Granger Causality Tests</em></strong> to determine the variables
 with the strongest causality over the whole feature set. The tests are of similar fashion with one being a <strong>Bivariate GCT</strong>
 and the other being a <strong>Multivariate GCT</strong>. Both tests are structured tho check statistical significance of the statement
-$ H_0: x \underset{\text{Granger-cause}}{\not\to} z $ and $ H_\alpha: x\underset{\text{Granger-cause}}{\to} z $. As any classical
-hypothesis test, we check of the p-value of $ H_0 $. Lower p-values indicate greater statistical evidence against <span class="arithmatex">\(H_0\)</span>, 
+<span class="arithmatex">\(H_0: x \underset{\text{Granger-cause}}{\not\to} z\)</span> and <span class="arithmatex">\(H_\alpha: x\underset{\text{Granger-cause}}{\to} z\)</span>. As any classical
+hypothesis test, we check of the p-value of <span class="arithmatex">\(H_0\)</span>. Lower p-values indicate greater statistical evidence against <span class="arithmatex">\(H_0\)</span>, 
 suggesting that <strong>x Granger-causes z</strong>. Importantly, GCT checks for linear causality so the significance we're computing 
-is for the probability of a function existing such that:</p>
-<div class="arithmatex">\[
+is for the probability of a function existing such that:
+$$
 f(x_t, x_{t-1}, \dots, x_{t-n}) = z_t
-\]</div>
+$$</p>
 <div class="arithmatex">\[
 \text{and}
 \]</div>
 <div class="arithmatex">\[
 f(x_t. x_{t-1}, \dots, x_{t-n}) = a_0x_t + a_1x_{t-1}+\dots+a_nx_{t-n}
 \]</div>
-<p>The multivariate case follow the same pattern and test if $ (x, y) \underset{Granger-cause}{\to}z $. Unfortunately, we're
+<p>The multivariate case follow the same pattern and test if <span class="arithmatex">\((x, y) \underset{Granger-cause}{\to}z\)</span>. Unfortunately, we're
 only testing for the existence of a function that satisfies the conditions defined above, therefore a multivariate test
 will not provide context regarding which variable is more significant in creating causality. <code>BaseVarSelector</code> ranks 
 variables (or pairs of variables) based on their p-values instead of using a threshold of significance to assert causality.
@@ -183,7 +183,7 @@ overall_score = {
 <li><code>pd.DataFrame</code>: Matrix of p-values for all GCTs computed.</li>
 </ul>
 <h3 id="basevarselectormultivar_granger_matrix"><code>BaseVarSelector.multivar_granger_matrix</code></h3>
-<p>Computes all <strong>Multivariate GCTs</strong> with two predictors ($ (x,y) \underset{\text{Granger-cause}}{\to}z $) and records the
+<p>Computes all <strong>Multivariate GCTs</strong> with two predictors (<span class="arithmatex">\((x,y) \underset{\text{Granger-cause}}{\to}z\)</span>) and records the
 variable ranks to <code>BaseVarSelector.score_dict</code>.</p>
 <p><strong>Params:</strong></p>
 <ul>
