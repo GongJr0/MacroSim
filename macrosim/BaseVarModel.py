@@ -1,5 +1,3 @@
-from macrosim.BaseVarSelector import BaseVarSelector
-
 from pysr import PySRRegressor
 
 import numpy as np
@@ -12,78 +10,85 @@ from sklearn.model_selection import train_test_split, GridSearchCV, KFold
 from sklearn.neighbors import LocalOutlierFactor
 
 from statsmodels.tsa.stattools import acf
-from typing import Optional, Any
 
-class BaseVarModel(BaseVarSelector):
+from typing import Optional, Any, Callable
 
-    def __init__(self, df: pd.DataFrame):
-        super().__init__(df)
-        self.df = df
+
+class BaseVarModel:
+
+    def __init__(self,
+                 var: pd.Series,
+                 lag_count_descriptor: Optional[Callable[[pd.Series], int]] = None):
+        self.var = var
+
         self.sr: PySRRegressor | None = None
         self.rf: RandomForestRegressor | None = None
 
         self.sr_loss: int | None = None
         self.rf_loss: int | None = None
 
-    def get_base_candidates(self) -> pd.DataFrame:
-        self.granger_matrix(score=True)
-        self.multivar_granger_matrix()
+        self.n_lags_func = lag_count_descriptor if lag_count_descriptor is not None else self.DEFAULT_LAG_COUNT
+        self.filtered = self.lof_filter()
 
-        scores = self.score_dict
-        agg_scores = {k: sum(scores[k].values()) for k in scores.keys()}
-        sorted_scores = sorted(agg_scores.items(), key=lambda x: x[1])
-
-        candidates = [score[0] for score in sorted_scores][:2]
-        return self.df[candidates]
-
-    @staticmethod
-    def lof_filter(candidate: pd.Series):
-        n = int(np.floor(np.sqrt(len(candidate))))
+    def lof_filter(self):
+        n = int(np.floor(np.sqrt(len(self.var))))
         lof = LocalOutlierFactor(n_neighbors=n, contamination='auto')
-        lof_mask = np.where(lof.fit_predict(candidate.to_frame()) == -1, True, False)
+        lof_mask = np.where(lof.fit_predict(self.var.to_frame()) == -1, True, False)
 
-        return candidate[lof_mask]
+        filtered = self.var[lof_mask]
+        if len(filtered) <= len(self.var)*0.75:  # LOF removes around 90% of rows sometimes (probably due to a bug)
+            return self.var
+        return filtered
 
-    @staticmethod
-    def get_seasonal_freq(candidate: pd.Series):
+    def get_seasonal_freq(self) -> int | None:
         # Compute ACF with a reasonable maximum lag (half of the series length)
-        max_lag = int(max(len(candidate) / 2, 2))  # Convert to integer for valid max_lag
-        acf_values = acf(candidate.values, nlags=max_lag)
+        max_lag = int(max(len(self.var) / 2, 2))
+        acf_values = acf(self.var.values, nlags=max_lag)
 
         acf_series = pd.Series(acf_values).pct_change().abs()
         significant_deltas = acf_series[acf_series >= 0.1]
 
+        def average_freq(lst: pd.Series) -> int | None:
+            if len(lst) < 2:
+                return None  # Not seasonal if 1 spike in ACF deltas
+            periods = [lst.iloc[i + 1] - lst.iloc[i] for i in range(len(lst) - 1)]
+            return round(sum(periods) / len(periods))
+
         if not significant_deltas.empty:
-            return significant_deltas.index[0]
+            return average_freq(significant_deltas)
         else:
             return None
 
-    def is_seasonal(self, candidate: pd.Series):
-        freq_est = self.get_seasonal_freq(candidate)
-        cycle_est = np.floor(len(candidate) / freq_est)
+    def is_seasonal(self):
+        freq_est = self.get_seasonal_freq()
+        if not freq_est:
+            return False
 
-        min_strong_lag = int(len(candidate) / 2)
+        min_strong_lag = np.floor(len(self.var) / freq_est*1.25)
 
-        autocorr = acf(candidate, nlags=min_strong_lag)
+        autocorr = acf(self.var, nlags=min_strong_lag)
         strong_lags = (np.abs(autocorr) >= 0.1).sum()
 
         return strong_lags >= min_strong_lag
 
-    @staticmethod
-    def get_lags(series: pd.Series) -> pd.DataFrame:
+    def get_lags(self, series) -> pd.DataFrame:
         lagged_df = series.to_frame()
         lagged_df.columns = ['X_t']
 
-        lags = int(np.floor(np.sqrt(len(lagged_df))))
+        lags = self.n_lags_func(self.var)
         for lag in range(1, lags + 1):
             lagged_df[f"X_t{lag}"] = lagged_df['X_t'].shift(lag)
 
         lagged_df = lagged_df.dropna(how='any')
         return lagged_df
 
-    def rf_distil(self, lagged_df: pd.DataFrame, grid_search: bool = False, gs_params: Optional[dict[str, list[Any]]] = None):
+    def rf_distil(self,
+                  grid_search: bool = False,
+                  gs_params: Optional[dict[str, list[Any]]] = None):
 
-        rf = RandomForestRegressor(random_state=0)
+        lagged_df = self.get_lags(self.filtered)
+
+        rf = RandomForestRegressor(n_estimators=300, random_state=0)
         X = lagged_df.drop('X_t', axis=1)
         y = lagged_df['X_t']
 
@@ -102,9 +107,9 @@ class BaseVarModel(BaseVarSelector):
 
         return pd.Series(rf.predict(X), name='X_t', index=y.index)
 
-    def symbolic_model(self, candidate: pd.Series, **kwargs) -> sp.Expr:
-        lof_filtered = self.lof_filter(candidate)
-        is_seasonal = self.is_seasonal(lof_filtered)
+    def symbolic_model(self, **kwargs) -> sp.Expr:
+        lof_filtered = self.filtered
+        is_seasonal = self.is_seasonal()
 
         unary = self.EXTRA_UNARY_DEFAULT
         constraints = self.CONSTRAINTS_DEFAULT
@@ -117,8 +122,7 @@ class BaseVarModel(BaseVarSelector):
             print("No seasonal behavior detected. Cyclical trig functions will be excluded in symbolic search.")
 
         lagged_df = self.get_lags(lof_filtered)
-        X_t = self.rf_distil(lagged_df,
-                             grid_search=kwargs.get('grid_search', False),
+        X_t = self.rf_distil(grid_search=kwargs.get('grid_search', False),
                              gs_params=kwargs.get('gs_params', {})).to_frame()
 
         X_lag = lagged_df.drop('X_t', axis=1)
@@ -175,6 +179,11 @@ class BaseVarModel(BaseVarSelector):
                   "Using Symbolic expressions as the base predictor.")
 
         return selected
+
+    @property
+    def DEFAULT_LAG_COUNT(self) -> Callable[[pd.Series], int]:
+        # Cube root of data length
+        return lambda x: int(np.ceil(len(x)**(1/3)))
 
     @property
     def EXTRA_UNARY_DEFAULT(self):
