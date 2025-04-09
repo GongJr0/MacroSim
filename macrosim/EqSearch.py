@@ -81,10 +81,24 @@ class EqSearch:
 
         self.distilled = pd.DataFrame(distilled_y, index=self.X.index)
 
+    @staticmethod
+    def get_new_sr(**kwargs) -> PySRRegressor:
+        return PySRRegressor(
+                    model_selection=kwargs.get('model_selection', 'accuracy'),  # type:ignore # Do not consider complexity at selection
+
+                    maxsize=kwargs.get('maxsize', 32),  # type:ignore
+                    niterations=kwargs.get('niterations', 300),  # type:ignore
+
+                    verbosity=kwargs.get('verbosity', 1),  # type:ignore
+                    progress=kwargs.get('progress', False),  # type:ignore
+                    temp_equation_file=kwargs.get('temp_equation_file', True),  # type:ignore
+                )
+
     def search(self, binary_ops: VALID_BINARY_OPS = FULL_BINARY_OPS, unary_ops=DEFAULT_UNARY_OPS,
                extra_unary_ops: Optional[dict[str, dict[str, Any]]] = None,
                custom_loss: Optional[str] = None,
                constraints: Optional[dict[str, tuple[int, int]]] = None,
+               cv: bool = False,
                **kwargs) -> None:
         
         if extra_unary_ops is None:
@@ -100,40 +114,50 @@ class EqSearch:
         binary_ops = list(binary_ops)
         unary_ops = list(unary_ops)
 
-        kf = KFold(n_splits=5, shuffle=True, random_state=self.random_state)
+        if cv:
+            kf = KFold(n_splits=5, shuffle=True, random_state=self.random_state)
 
-        folds = []
-        for fold, (train_idx, val_idx) in enumerate(kf.split(self.X)):
-            X_train, X_val = self.X.iloc[train_idx], self.X.iloc[val_idx]
-            y_train, y_val = self.y.iloc[train_idx], self.y.iloc[val_idx]
+            folds = []
+            for fold, (train_idx, val_idx) in enumerate(kf.split(self.X)):
+                X_train, X_val = self.X.iloc[train_idx], self.X.iloc[val_idx]
+                y_train, y_val = self.y.iloc[train_idx], self.y.iloc[val_idx]
 
-            curr_sr = PySRRegressor(
-                model_selection='accuracy',  # type:ignore # Do not consider complexity at selection
+                curr_sr = self.get_new_sr(**kwargs)
+                curr_sr.set_params(
+                    binary_operators=binary_ops,  # type:ignore
+                    unary_operators=[*unary_ops, *[x['julia'] for x in extra_unary.values()]],  # type:ignore
+                    extra_sympy_mappings={x[0]: x[1]['sympy'] for x in extra_unary.items()},  # type:ignore
 
-                maxsize=kwargs.get('maxsize', 32),  # type:ignore
-                niterations=kwargs.get('niterations', 300),  # type:ignore
+                    elementwise_loss=custom_loss if custom_loss else 'L2DistLoss()',  # type:ignore
 
+                    constraints={'^': (-1, 1)} | constraints,
+                    random_state=self.random_state,  # type:ignore
+                    deterministic=True,  # type:ignore
+                    parallelism='serial'  # type:ignore
+                )
+
+                curr_sr.fit(X_train, y_train)
+                fold_mse = mean_squared_error(curr_sr.predict(X_val), y_val)
+                folds.append((curr_sr, fold_mse))
+
+            sr = sorted(folds, key=lambda x: x[1])[0][0]
+            self.sr = sr
+
+        else:
+            curr_sr = self.get_new_sr(**kwargs)
+            curr_sr.set_params(
                 binary_operators=binary_ops,  # type:ignore
                 unary_operators=[*unary_ops, *[x['julia'] for x in extra_unary.values()]],  # type:ignore
                 extra_sympy_mappings={x[0]: x[1]['sympy'] for x in extra_unary.items()},  # type:ignore
 
                 elementwise_loss=custom_loss if custom_loss else 'L2DistLoss()',  # type:ignore
 
-                constraints={'^': (-1, 1)} | constraints,  # type:ignore
-
-                verbosity=kwargs.get('verbosity', 1),  # type:ignore
-                progress=kwargs.get('progress', False),  # type:ignore
-                temp_equation_file=kwargs.get('temp_equation_file', True),  # type:ignore
+                constraints={'^': (-1, 1)} | constraints,
                 random_state=self.random_state,  # type:ignore
                 deterministic=True,  # type:ignore
                 parallelism='serial'  # type:ignore
             )
+            curr_sr.fit(self.X, self.y)
+            self.sr = curr_sr
 
-            curr_sr.fit(X_train, y_train)
-            fold_mse = mean_squared_error(curr_sr.predict(X_val), y_val)
-            folds.append((curr_sr, fold_mse))
-
-        sr = sorted(folds, key=lambda x: x[1])[0][0]
-
-        self.sr = sr
-        self.eq: Callable = sr.get_best()['sympy_format']
+        self.eq: Callable = self.sr.get_best()['sympy_format']
