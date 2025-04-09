@@ -120,7 +120,8 @@ class GrowthDetector:
 
             # Misc Params
             temp_equation_file=True,
-            progress=False
+            progress=False,
+            batching=True
 
         )
         return sr
