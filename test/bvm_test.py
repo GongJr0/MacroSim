@@ -26,10 +26,14 @@ df = fred.fill(
     methods=[None, None, None, None, 'ffill', 'divide', None]
 )
 
+bvs = BaseVarSelector(df)
+base = bvs.get_base_candidates()
+print(f"{base.columns[1]} is being modelled...")
 
-bvm = BaseVarModel(df=df)
-candidates = bvm.get_base_candidates()
+bvm = BaseVarModel(base.iloc[:, 1])
 
-bvm.symbolic_model(candidate=candidates['POPGROWTH'], progress=True, niterations=100, constraints={'atan': 2})
+bvm.symbolic_model(progress=True, maxsize=16, niterations=100, constraints={'atan': 2})
 if bvm.model_select() == bvm.sr:
+    print(f"SR Loss: {bvm.sr_loss}")
+    print(f"RF Loss: {bvm.rf_loss}")
     print(bvm.sr.get_best())
