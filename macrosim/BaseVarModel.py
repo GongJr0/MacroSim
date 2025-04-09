@@ -107,7 +107,7 @@ class BaseVarModel:
 
         return pd.Series(rf.predict(X), name='X_t', index=y.index)
 
-    def symbolic_model(self, **kwargs) -> sp.Expr:
+    def symbolic_model(self, cv=5, **kwargs) -> sp.Expr:
         lof_filtered = self.filtered
         is_seasonal = self.is_seasonal()
 
@@ -128,7 +128,7 @@ class BaseVarModel:
         X_lag = lagged_df.drop('X_t', axis=1)
 
         folds = []
-        kf = KFold(n_splits=5, shuffle=True, random_state=0)
+        kf = KFold(n_splits=cv, shuffle=True, random_state=0)
         for fold, (train_idx, test_idx) in enumerate(kf.split(X_t.index)):
             X_train, X_val = X_lag.iloc[train_idx], X_lag.iloc[test_idx]
             y_train, y_val = X_t.iloc[train_idx], X_t.iloc[test_idx]
