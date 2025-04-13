@@ -1,7 +1,7 @@
-from typing import Optional, Any, Literal
+from typing import Optional, Any
 
-from jedi.inference.gradual.typing import Callable
 from pysr import PySRRegressor
+import sympy as sp
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
@@ -42,8 +42,6 @@ class EqSearch:
         self.random_state = random_state
 
         self.distilled = None
-
-        self.eq: Optional[Callable] = None
 
         self.sr = PySRRegressor()
 
@@ -160,4 +158,10 @@ class EqSearch:
             curr_sr.fit(self.X, self.y)
             self.sr = curr_sr
 
-        self.eq: Callable = self.sr.get_best()['sympy_format']
+    @property
+    def get_eq(self) -> sp.Expr:
+        return self.sr.get_best()['sympy_format']
+
+    @property
+    def get_model(self) -> PySRRegressor:
+        return self.sr

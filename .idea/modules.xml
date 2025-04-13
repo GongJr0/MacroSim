@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/MacroSim.iml" filepath="$PROJECT_DIR$/.idea/MacroSim.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../MacroSim-Test/.idea/MacroSim-Test.iml" filepath="$PROJECT_DIR$/../MacroSim-Test/.idea/MacroSim-Test.iml" />
     </modules>
   </component>
 </project>
