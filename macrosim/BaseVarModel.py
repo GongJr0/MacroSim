@@ -64,9 +64,9 @@ class BaseVarModel:
         if not freq_est:
             return False
 
-        min_strong_lag = np.floor(len(self.var) / freq_est*1.25)
+        min_strong_lag = np.floor(len(self.var) / (freq_est*1.25))
 
-        autocorr = acf(self.var, nlags=min_strong_lag)
+        autocorr = acf(self.var)
         strong_lags = (np.abs(autocorr) >= 0.1).sum()
 
         return strong_lags >= min_strong_lag
