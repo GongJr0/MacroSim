@@ -1,13 +1,12 @@
 from fredapi import Fred
 import pandas as pd
-import numpy as np
 import datetime as dt
 
 from dotenv import load_dotenv
-from os import getenv, PathLike
+from os import getenv
 from pathlib import Path
 
-from typing import Union, Sequence, Optional, Literal, Callable, Any
+from typing import Union, Sequence, Optional, Literal, Callable
 
 
 class SeriesAccessor:
@@ -68,7 +67,7 @@ class SeriesAccessor:
 
     def fill(self,
              data: pd.DataFrame,
-             methods: Sequence[Union[Literal['divide', 'bfill', 'ffill', 'mean', 'median', 'IQR_mean'], Callable[[pd.Series], pd.Series]]]) -> pd.DataFrame:
+             methods: Sequence[Union[Literal['divide', 'bfill', 'ffill', 'mean', 'median', 'IQR_mean'], Callable[[pd.Series], pd.Series], None]]) -> pd.DataFrame:
         df = data.copy()
         if len(methods) == len(df.columns):
             methods = [*methods, *[None] * (len(df.columns) - len(methods))]

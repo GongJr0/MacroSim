@@ -64,22 +64,33 @@ class SimEngine:
     def _entropy(coef) -> Generator[float, None, None]:
         yield np.random.normal(1, coef)
 
+    def _format_lags(self):
+        n_lags = self.n_lags
+        data = self.param_space_df.tail(n_lags)
+        new_index = data.columns
+        new_columns = [f"X_t{x}" for x in range(1, n_lags + 1)]
+        data = data.T
+        data = data.set_index(new_index)
+        data.columns = new_columns
+        return data
+
     def _simulate_step(self) -> None:
 
-        step_lags = self.param_space_df.tail(self.n_lags)
+        step_lags = self._format_lags()
+
         base_params = {
-            k: self.base_growth[k].predict(step_lags[k]) for k in self.base_growth.keys()
+            k: self.base_growth[k].predict(step_lags.loc[k, :].to_frame().T) for k in self.base_growth.keys()
         }
 
         non_base_params = {
-            k: self.non_base_growth[k].predict(np.array([*step_lags[k].values, *list(base_params.values())]))
+            k: self.non_base_growth[k].predict(np.array([*list(step_lags.loc[k, :].to_frame().values), *list(base_params.values())]).reshape((1, -1)))
             for k in self.non_base_growth.keys()
         }
         unordered_params = {**base_params, **non_base_params}
 
         eq_params = {param: unordered_params[param] for param in self.param_names}
 
-        model_input = np.array([var for var in eq_params.values()])
+        model_input = np.array([var for var in eq_params.values()]).reshape(1, -1)
         out = self.sr.predict(model_input)
         self._out.extend(out)
 
@@ -94,12 +105,13 @@ class SimEngine:
     def simulate(self, n_steps: int) -> pd.DataFrame:
         for _ in range(n_steps):
             self._simulate_step()
-            print(f"Simulated step {_+1}")
 
         return self.get_history
 
     def _output_constructor(self):
-        return pd.Series(self._out, name="output")
+        out = pd.Series(self._out, name="output")
+        out.index = out.index + self.n_lags  # Adjust for lagged inputs
+        return out
 
     @property
     def get_states(self):
@@ -109,4 +121,4 @@ class SimEngine:
 
     @property
     def get_history(self):
-        return pd.concat([self.param_space_df, self._out], ignore_index=True)
+        return pd.concat([self.param_space_df, self._output_constructor()], axis=1)

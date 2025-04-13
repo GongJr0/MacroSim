@@ -63,9 +63,6 @@ class GrowthDetector:
 
         return series[lof_mask]
 
-
-
-
     def get_lags(self, series) -> pd.DataFrame:
         lagged_df = series.to_frame()
         lagged_df.columns = ['X_t']
@@ -76,7 +73,6 @@ class GrowthDetector:
 
         lagged_df = lagged_df.dropna(how='any')
         return lagged_df
-
 
     def get_base_var_growth(self, cv=5) -> None:
         base = self.base
@@ -111,7 +107,7 @@ class GrowthDetector:
                 estimator.fit(X, y)
                 self.estimators[var] = GrowthEstimator(model=estimator, is_base=False)
 
-    def compose_estimators(self, cv=5) -> dict[str, PySRRegressor | RandomForestRegressor]:
+    def compose_estimators(self, cv=5) -> dict[str, GrowthEstimator]:
         self.get_base_var_growth(cv)
         self.get_non_base_var_growth()
 
