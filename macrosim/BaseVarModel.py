@@ -70,7 +70,7 @@ class BaseVarModel:
         detrended = detrended.dropna()
 
         autocorr = acf(detrended, fft=True, nlags=min(100, len(detrended) // 2))
-        acf_peaks = (autocorr[1:] > 0.5).sum()  # ignore lag 0, count strong spikes
+        acf_peaks = (autocorr[1:] > 0.5).sum()  # Ignore lag 0, count strong spikes
 
         freqs, power = periodogram(detrended, scaling='spectrum')
         power_threshold = np.mean(power) + 3 * np.std(power)
@@ -108,11 +108,18 @@ class BaseVarModel:
         else:
             rf.fit(X_train, y_train)
 
-        print(f"RandomForest score at distillation: {rf.score(X_test, y_test):.3f}")
+        score = rf.score(X_test, y_test)
+        print(f"RandomForest score at distillation: {score:.3f}")
+
+        if score >= 0.9:
+            print('Distillation has acceptable accuracy.')
+        else:
+            print('Distillation is rejected due to low accuracy.')
+
         self.rf = rf
         self.rf_loss = mean_squared_error(y_test, rf.predict(X_test))
 
-        return pd.Series(rf.predict(X), name='X_t', index=y.index)
+        return pd.Series(rf.predict(X), name='X_t', index=y.index) if score >= 0.9 else y
 
     def symbolic_model(self, cv=5, **kwargs) -> sp.Expr:
         lof_filtered = self.filtered
@@ -126,7 +133,7 @@ class BaseVarModel:
             unary = unary | self.EXTRA_UNARY_SEASONAL
             constraints = constraints | self.CONSTRAINTS_SEASONAL
         else:
-            print(f"No seasonality detected in {self.var.name}.")
+            print(f"No seasonality detected in {self.var.name}. Cyclical trig functions are disabled.")
 
         lagged_df = self.get_lags(lof_filtered)
         X_t = self.rf_distil(grid_search=kwargs.get('grid_search', False),

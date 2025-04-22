@@ -128,5 +128,8 @@ class BaseVarSelector:
         agg_scores = {k: (2/3)*scores[k]['Granger'] + (1/3)*scores[k]['Multivar_Granger'] + scores[k]['ADF'] for k in scores.keys()}
         sorted_scores = sorted(agg_scores.items(), key=lambda x: x[1])
 
-        candidates = [score[0] for score in sorted_scores][:2]
-        return self.df[candidates]
+        n_base: np.int_ = np.ceil(np.sqrt(len(sorted_scores)))
+        base = [score[0] for score in sorted_scores][:n_base]
+        print('Selected Base variables:')
+        print('\n- '.join(base))
+        return self.df[base]
