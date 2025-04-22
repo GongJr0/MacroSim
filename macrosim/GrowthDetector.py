@@ -76,9 +76,9 @@ class GrowthDetector:
 
     def get_base_var_growth(self, cv=5) -> None:
         base = self.base
-        vars = self.base_vars
+        var_ls = self.base_vars
 
-        for var in vars:
+        for var in var_ls:
             series = base[var]
             bvm = BaseVarModel(series)
 
@@ -96,9 +96,9 @@ class GrowthDetector:
             if var not in self.base_vars:
                 estimator = self.sr_generator()
 
-                filtered = self.lof_filter(self.df[var])
+                # filtered = self.lof_filter(self.df[var])
 
-                lags = self.get_lags(filtered)
+                lags = self.get_lags(self.df[var])
                 base_index_matched = base.loc[lags.index, :]
 
                 X = pd.concat([lags.drop('X_t', axis=1), base_index_matched], axis=1)
