@@ -16,8 +16,7 @@ import numpy as np
 VALID_BINARY_OPS = tuple['+', '-', '*', '/', '^']
 FULL_BINARY_OPS: VALID_BINARY_OPS = ('+', '-', '*', '/', '^')
 
-DEFAULT_UNARY_OPS: tuple = ('exp')
-
+DEFAULT_UNARY = tuple()
 
 class EqSearch:
     """
@@ -41,6 +40,10 @@ class EqSearch:
             'safe_sqrt': {
                 'julia': 'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
                 'sympy': lambda x: sp.sign(x) * sp.sqrt(abs(x))
+            },
+            'exp': {
+                'julia': 'exp',
+                'sympy': lambda x: sp.exp(x)
             }
         }
 
@@ -102,7 +105,7 @@ class EqSearch:
 
     def search(self,
                binary_ops: VALID_BINARY_OPS = FULL_BINARY_OPS,
-               unary_ops=DEFAULT_UNARY_OPS,
+               unary_ops=DEFAULT_UNARY,
                extra_unary_ops: Optional[dict[str, dict[str, Any]]] = None,
                custom_loss: Optional[str] = None,
                constraints: Optional[dict[str, tuple[int, int]]] = None,
