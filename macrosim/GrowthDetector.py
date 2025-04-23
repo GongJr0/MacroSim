@@ -95,10 +95,9 @@ class GrowthDetector:
         for var in self.vars:
             if var not in self.base_vars:
                 estimator = self.sr_generator()
+                filtered = self.lof_filter(self.df[var])
 
-                # filtered = self.lof_filter(self.df[var])
-
-                lags = self.get_lags(self.df[var])
+                lags = self.get_lags(filtered)
                 base_index_matched = base.loc[lags.index, :]
 
                 X = pd.concat([lags.drop('X_t', axis=1), base_index_matched], axis=1)
@@ -126,7 +125,7 @@ class GrowthDetector:
     def sr_generator():
         sr = PySRRegressor(
             # Search method config
-            model_selection='best',
+            model_selection='accuracy',
             maxsize=16,
             niterations=100,
 
@@ -159,7 +158,6 @@ class GrowthDetector:
 
         )
         return sr
-
 
     @property
     def IS_BASE(self):

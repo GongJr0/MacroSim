@@ -249,7 +249,8 @@ class BaseVarModel:
     @property
     def CONSTRAINTS_DEFAULT(self):
         return {
-            '^': (-1, 3)
+            '^': (-1, 3),
+            'atan': 3
         }
 
     @property
