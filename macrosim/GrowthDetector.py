@@ -2,18 +2,15 @@ from macrosim.BaseVarSelector import BaseVarSelector
 from macrosim.BaseVarModel import BaseVarModel
 
 from pysr import PySRRegressor
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import LocalOutlierFactor
 
 import pandas as pd
 import numpy as np
 
-import scipy.optimize as opt
-from typing import Callable, Any
-
 import sympy as sp
 
 import pickle
+from joblib import Parallel, delayed
 
 
 class GrowthEstimator:
@@ -78,7 +75,7 @@ class GrowthDetector:
         base = self.base
         var_ls = self.base_vars
 
-        for var in var_ls:
+        def fit_variable(var):
             series = base[var]
             bvm = BaseVarModel(series)
 
@@ -86,25 +83,38 @@ class GrowthDetector:
             estimator = bvm.model_select()
             estimator = GrowthEstimator(estimator, is_base=True)
 
+            return var, estimator
+        results = Parallel(n_jobs=-1)(
+            delayed(fit_variable)(var) for var in var_ls
+        )
+
+        for var, estimator in results:
             self.base_estimators[var] = estimator
             self.estimators[var] = estimator
 
     def get_non_base_var_growth(self) -> None:
         base = self.base
 
-        for var in self.vars:
-            if var not in self.base_vars:
-                estimator = self.sr_generator()
-                filtered = self.lof_filter(self.df[var])
+        def fit_non_base_var(var):
+            estimator = self.sr_generator()
+            filtered = self.lof_filter(self.df[var])
 
-                lags = self.get_lags(filtered)
-                base_index_matched = base.loc[lags.index, :]
+            lags = self.get_lags(filtered)
+            base_index_matched = base.loc[lags.index, :]
 
-                X = pd.concat([lags.drop('X_t', axis=1), base_index_matched], axis=1)
-                y = lags['X_t']
+            X = pd.concat([lags.drop('X_t', axis=1), base_index_matched], axis=1)
+            y = lags['X_t']
 
-                estimator.fit(X, y)
-                self.estimators[var] = GrowthEstimator(model=estimator, is_base=False)
+            estimator.fit(X, y)
+            return var, GrowthEstimator(model=estimator, is_base=False)
+
+        results = Parallel(n_jobs=-1)(
+            delayed(fit_non_base_var)(var)
+            for var in self.vars if var not in self.base_vars
+        )
+
+        for var, estimator in results:
+            self.estimators[var] = estimator
 
     def compose_estimators(self, cv=5, **kwargs) -> dict[str, GrowthEstimator]:
         self.get_base_var_growth(cv, **kwargs)
