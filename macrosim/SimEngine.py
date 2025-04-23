@@ -121,4 +121,4 @@ class SimEngine:
 
     @property
     def get_history(self):
-        return pd.concat([self.param_space_df, self._output_constructor()], axis=1)
+        return pd.concat([self.param_space_df, self._output_constructor()], axis=1)[5:].reset_index(drop=True)

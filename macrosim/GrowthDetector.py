@@ -76,9 +76,9 @@ class GrowthDetector:
 
     def get_base_var_growth(self, cv=5) -> None:
         base = self.base
-        vars = self.base_vars
+        var_ls = self.base_vars
 
-        for var in vars:
+        for var in var_ls:
             series = base[var]
             bvm = BaseVarModel(series)
 
@@ -95,7 +95,6 @@ class GrowthDetector:
         for var in self.vars:
             if var not in self.base_vars:
                 estimator = self.sr_generator()
-
                 filtered = self.lof_filter(self.df[var])
 
                 lags = self.get_lags(filtered)
@@ -126,21 +125,30 @@ class GrowthDetector:
     def sr_generator():
         sr = PySRRegressor(
             # Search method config
-            model_selection='best',
+            model_selection='accuracy',
             maxsize=16,
             niterations=100,
 
             # Operations config
             binary_operators=['+', '-', '*', '/', '^'],
-            unary_operators=['exp', 'log', 'sqrt', 'inv(x)=1/x'],
-            extra_sympy_mappings={'inv': lambda x: 1/x},
+            unary_operators=['exp',
+                             'safe_log(x) = sign(x) * log(abs(x))',
+                             'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
+                             'soft_guard_root(x) = sqrt(sqrt(x^2 + 1e-8))',
+                             'inv(x)=1/x'],
+            extra_sympy_mappings={
+                'inv': lambda x: 1/x,
+                'safe_log': lambda x: sp.sign(x) * sp.log(abs(x)),
+                'safe_sqrt': lambda x: sp.sign(x) * sp.sqrt(abs(x)),
+                'soft_guard_root': lambda x: sp.sqrt(sp.sqrt(x**2 + 1e-8)),
+            },
 
             # Constraints config
             constraints={
                 '^': {-1, 2},
                 'exp': 4,
-                'log': 4,
-                'sqrt': 2,
+                'safe_log': 4,
+                'safe_sqrt': 2,
                 'inv': -1
             },
 
@@ -159,7 +167,6 @@ class GrowthDetector:
 
         )
         return sr
-
 
     @property
     def IS_BASE(self):

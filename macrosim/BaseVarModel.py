@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV, KFold
 from sklearn.neighbors import LocalOutlierFactor
 
 from statsmodels.tsa.stattools import acf
+from scipy.signal import periodogram
 
 from typing import Optional, Any, Callable
 
@@ -59,17 +60,23 @@ class BaseVarModel:
         else:
             return None
 
-    def is_seasonal(self):
-        freq_est = self.get_seasonal_freq()
-        if not freq_est:
+    @staticmethod
+    def is_seasonal(series: pd.Series) -> bool:
+
+        if len(series) < 24:  # High likelihood of overfitting for short series
             return False
 
-        min_strong_lag = np.floor(len(self.var) / (freq_est*1.25))
+        detrended = series - pd.Series(series).rolling(window=5, center=True).mean()
+        detrended = detrended.dropna()
 
-        autocorr = acf(self.var)
-        strong_lags = (np.abs(autocorr) >= 0.1).sum()
+        autocorr = acf(detrended, fft=True, nlags=min(100, len(detrended) // 2))
+        acf_peaks = (autocorr[1:] > 0.5).sum()  # Ignore lag 0, count strong spikes
 
-        return strong_lags >= min_strong_lag
+        freqs, power = periodogram(detrended, scaling='spectrum')
+        power_threshold = np.mean(power) + 3 * np.std(power)
+        dominant_peaks = (power > power_threshold).sum()
+
+        return acf_peaks >= 1 and dominant_peaks >= 1
 
     def get_lags(self, series) -> pd.DataFrame:
         lagged_df = series.to_frame()
@@ -101,25 +108,32 @@ class BaseVarModel:
         else:
             rf.fit(X_train, y_train)
 
-        print(f"RandomForest score at distillation: {rf.score(X_test, y_test):.3f}")
+        score = rf.score(X_test, y_test)
+        print(f"RandomForest score at distillation: {score:.3f}")
+
+        if score >= 0.9:
+            print('Distillation has acceptable accuracy.')
+        else:
+            print('Distillation is rejected due to low accuracy.')
+
         self.rf = rf
         self.rf_loss = mean_squared_error(y_test, rf.predict(X_test))
 
-        return pd.Series(rf.predict(X), name='X_t', index=y.index)
+        return pd.Series(rf.predict(X), name='X_t', index=y.index) if score >= 0.9 else y
 
     def symbolic_model(self, cv=5, **kwargs) -> sp.Expr:
         lof_filtered = self.filtered
-        is_seasonal = self.is_seasonal()
+        is_seasonal = self.is_seasonal(self.var)
 
-        unary = self.EXTRA_UNARY_DEFAULT
+        unary = self.UNARY_DEFAULT | self.EXTRA_UNARY_DEFAULT
         constraints = self.CONSTRAINTS_DEFAULT
 
         if is_seasonal:
-            print("Detected seasonal autocorrelation. Cyclical trig functions will be included in symbolic search.")
+            print(f"Cyclical trig functions are enabled for {self.var.name} due to detected seasonality.")
             unary = unary | self.EXTRA_UNARY_SEASONAL
             constraints = constraints | self.CONSTRAINTS_SEASONAL
         else:
-            print("No seasonal behavior detected. Cyclical trig functions will be excluded in symbolic search.")
+            print(f"No seasonality detected in {self.var.name}. Cyclical trig functions are disabled.")
 
         lagged_df = self.get_lags(lof_filtered)
         X_t = self.rf_distil(grid_search=kwargs.get('grid_search', False),
@@ -172,11 +186,11 @@ class BaseVarModel:
         loss_diff = (self.sr_loss / self.rf_loss) - 1
         if loss_diff >= loss_diff_threshold:
             selected = self.rf
-            print(f"SR Model Introduces {loss_diff:.2%} more MSE compared to RF predictions. "
+            print(f"SR Model introduces {loss_diff:.2%} higher MSE compared to RF predictions. "
                   f"Falling back to RF predictions.")
         else:
             selected = self.sr
-            print("SR did not introduce a significant MSE increase compared to RF predictions. "
+            print(f"SR did not introduce a significant MSE increase ({loss_diff:.2%}) compared to RF predictions. "
                   "Using Symbolic expressions as the base predictor.")
 
         return selected
@@ -226,7 +240,26 @@ class BaseVarModel:
 
     @property
     def UNARY_DEFAULT(self):
-        return ['exp', 'log', 'sqrt']
+        return {
+            'safe_log': {
+                'julia': 'safe_log(x) = sign(x) * log(abs(x))',
+                'sympy': lambda x: sp.sign(x) * sp.log(abs(x))
+            },
+            'safe_sqrt': {
+                'julia': 'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
+                'sympy': lambda x: sp.sign(x) * sp.sqrt(abs(x))
+            },
+
+            'soft_guard_root': {
+                'julia': 'soft_guard_root(x) = sqrt(sqrt(x^2 + 1e-8))',
+                'sympy': lambda x: sp.sqrt(sp.sqrt(x^2 + 1e-8))
+            },
+
+            'exp': {
+                'julia': 'exp',
+                'sympy': lambda x: sp.exp(x)
+            }
+        }
 
     @property
     def BINARY_DEFAULT(self):
@@ -235,7 +268,8 @@ class BaseVarModel:
     @property
     def CONSTRAINTS_DEFAULT(self):
         return {
-            '^': (-1, 3)
+            '^': (-1, 3),
+            'atan': 3
         }
 
     @property

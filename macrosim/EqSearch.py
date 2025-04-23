@@ -16,8 +16,7 @@ import numpy as np
 VALID_BINARY_OPS = tuple['+', '-', '*', '/', '^']
 FULL_BINARY_OPS: VALID_BINARY_OPS = ('+', '-', '*', '/', '^')
 
-DEFAULT_UNARY_OPS: tuple = ('exp', 'log', 'sqrt')
-
+DEFAULT_UNARY = tuple()
 
 class EqSearch:
     """
@@ -33,6 +32,22 @@ class EqSearch:
             'inv': {
                 'julia': 'inv(x)=1/x',
                 'sympy': lambda x: 1/x
+            },
+            'safe_log': {
+                'julia': 'safe_log(x) = sign(x) * log(abs(x))',
+                'sympy': lambda x: sp.sign(x) * sp.log(abs(x))
+            },
+            'safe_sqrt': {
+                'julia': 'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
+                'sympy': lambda x: sp.sign(x) * sp.sqrt(abs(x))
+            },
+            'soft_guard_root': {
+                'julia': 'soft_guard_root(x) = sqrt(sqrt(x^2 + 1e-8))',
+                'sympy': lambda x: sp.sqrt(sp.sqrt(x ** 2 + 1e-8))
+            },
+            'exp': {
+                'julia': 'exp',
+                'sympy': lambda x: sp.exp(x)
             }
         }
 
@@ -92,7 +107,9 @@ class EqSearch:
                     temp_equation_file=kwargs.get('temp_equation_file', True),  # type:ignore
                 )
 
-    def search(self, binary_ops: VALID_BINARY_OPS = FULL_BINARY_OPS, unary_ops=DEFAULT_UNARY_OPS,
+    def search(self,
+               binary_ops: VALID_BINARY_OPS = FULL_BINARY_OPS,
+               unary_ops=DEFAULT_UNARY,
                extra_unary_ops: Optional[dict[str, dict[str, Any]]] = None,
                custom_loss: Optional[str] = None,
                constraints: Optional[dict[str, tuple[int, int]]] = None,
