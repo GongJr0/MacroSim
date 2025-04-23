@@ -2,18 +2,15 @@ from macrosim.BaseVarSelector import BaseVarSelector
 from macrosim.BaseVarModel import BaseVarModel
 
 from pysr import PySRRegressor
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import LocalOutlierFactor
 
 import pandas as pd
 import numpy as np
 
-import scipy.optimize as opt
-from typing import Callable, Any
-
 import sympy as sp
 
 import pickle
+from joblib import Parallel, delayed
 
 
 class GrowthEstimator:
@@ -74,40 +71,53 @@ class GrowthDetector:
         lagged_df = lagged_df.dropna(how='any')
         return lagged_df
 
-    def get_base_var_growth(self, cv=5) -> None:
+    def get_base_var_growth(self, cv=5, **kwargs) -> None:
         base = self.base
         var_ls = self.base_vars
 
-        for var in var_ls:
+        def fit_variable(var):
             series = base[var]
             bvm = BaseVarModel(series)
 
-            bvm.symbolic_model(cv=cv)
+            bvm.symbolic_model(cv=cv, **kwargs)
             estimator = bvm.model_select()
             estimator = GrowthEstimator(estimator, is_base=True)
 
+            return var, estimator
+        results = Parallel(n_jobs=-1)(
+            delayed(fit_variable)(var) for var in var_ls
+        )
+
+        for var, estimator in results:
             self.base_estimators[var] = estimator
             self.estimators[var] = estimator
 
     def get_non_base_var_growth(self) -> None:
         base = self.base
 
-        for var in self.vars:
-            if var not in self.base_vars:
-                estimator = self.sr_generator()
-                filtered = self.lof_filter(self.df[var])
+        def fit_non_base_var(var):
+            estimator = self.sr_generator()
+            filtered = self.lof_filter(self.df[var])
 
-                lags = self.get_lags(filtered)
-                base_index_matched = base.loc[lags.index, :]
+            lags = self.get_lags(filtered)
+            base_index_matched = base.loc[lags.index, :]
 
-                X = pd.concat([lags.drop('X_t', axis=1), base_index_matched], axis=1)
-                y = lags['X_t']
+            X = pd.concat([lags.drop('X_t', axis=1), base_index_matched], axis=1)
+            y = lags['X_t']
 
-                estimator.fit(X, y)
-                self.estimators[var] = GrowthEstimator(model=estimator, is_base=False)
+            estimator.fit(X, y)
+            return var, GrowthEstimator(model=estimator, is_base=False)
 
-    def compose_estimators(self, cv=5) -> dict[str, GrowthEstimator]:
-        self.get_base_var_growth(cv)
+        results = Parallel(n_jobs=-1)(
+            delayed(fit_non_base_var)(var)
+            for var in self.vars if var not in self.base_vars
+        )
+
+        for var, estimator in results:
+            self.estimators[var] = estimator
+
+    def compose_estimators(self, cv=5, **kwargs) -> dict[str, GrowthEstimator]:
+        self.get_base_var_growth(cv, **kwargs)
         self.get_non_base_var_growth()
 
         return self.estimators
@@ -134,13 +144,13 @@ class GrowthDetector:
             unary_operators=['exp',
                              'safe_log(x) = sign(x) * log(abs(x))',
                              'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
-                             'soft_guard_root(x) = sqrt(sqrt(x^2 + 1e-8))',
+                             'soft_guard_root(x::T) where {T<:Real} = sqrt(sqrt(x^2 + T(1e-6)))',
                              'inv(x)=1/x'],
             extra_sympy_mappings={
                 'inv': lambda x: 1/x,
                 'safe_log': lambda x: sp.sign(x) * sp.log(abs(x)),
                 'safe_sqrt': lambda x: sp.sign(x) * sp.sqrt(abs(x)),
-                'soft_guard_root': lambda x: sp.sqrt(sp.sqrt(x**2 + 1e-8)),
+                'soft_guard_root': lambda x: sp.sqrt(sp.sqrt(x**2 + 1e-6)),
             },
 
             # Constraints config

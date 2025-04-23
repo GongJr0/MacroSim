@@ -26,7 +26,8 @@ class EqSearch:
     def __init__(self,
                  X: pd.DataFrame,
                  y: pd.DataFrame | pd.Series,  # y.shape = (-1, 1)
-                 random_state: int = 0) -> None:
+                 random_state: int = 0,
+                 **kwargs) -> None:
 
         self.extra_unary: dict[str, dict[str, Any]] = {
             'inv': {
@@ -42,8 +43,8 @@ class EqSearch:
                 'sympy': lambda x: sp.sign(x) * sp.sqrt(abs(x))
             },
             'soft_guard_root': {
-                'julia': 'soft_guard_root(x) = sqrt(sqrt(x^2 + 1e-8))',
-                'sympy': lambda x: sp.sqrt(sp.sqrt(x ** 2 + 1e-8))
+                'julia': 'soft_guard_root(x::T) where {T<:Real} = sqrt(sqrt(x^2 + T(1e-6)))',  # 1e-6 = safe epsilon at 32bit precision
+                'sympy': lambda x: sp.sqrt(sp.sqrt(x ** 2 + 1e-6))
             },
             'exp': {
                 'julia': 'exp',
