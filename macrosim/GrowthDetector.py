@@ -134,11 +134,13 @@ class GrowthDetector:
             unary_operators=['exp',
                              'safe_log(x) = sign(x) * log(abs(x))',
                              'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
+                             'soft_guard_root(x) = sqrt(sqrt(x^2 + 1e-8))',
                              'inv(x)=1/x'],
             extra_sympy_mappings={
                 'inv': lambda x: 1/x,
                 'safe_log': lambda x: sp.sign(x) * sp.log(abs(x)),
                 'safe_sqrt': lambda x: sp.sign(x) * sp.sqrt(abs(x)),
+                'soft_guard_root': lambda x: sp.sqrt(sp.sqrt(x**2 + 1e-8)),
             },
 
             # Constraints config

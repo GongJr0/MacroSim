@@ -249,6 +249,12 @@ class BaseVarModel:
                 'julia': 'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
                 'sympy': lambda x: sp.sign(x) * sp.sqrt(abs(x))
             },
+
+            'soft_guard_root': {
+                'julia': 'soft_guard_root(x) = sqrt(sqrt(x^2 + 1e-8))',
+                'sympy': lambda x: sp.sqrt(sp.sqrt(x^2 + 1e-8))
+            },
+
             'exp': {
                 'julia': 'exp',
                 'sympy': lambda x: sp.exp(x)
