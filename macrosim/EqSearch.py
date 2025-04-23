@@ -43,7 +43,7 @@ class EqSearch:
             },
             'soft_guard_root': {
                 'julia': 'soft_guard_root(x) = sqrt(sqrt(x^2 + 1e-8))',
-                'sympy': lambda x: sp.sqrt(sp.sqrt(x ^ 2 + 1e-8))
+                'sympy': lambda x: sp.sqrt(sp.sqrt(x ** 2 + 1e-8))
             },
             'exp': {
                 'julia': 'exp',
