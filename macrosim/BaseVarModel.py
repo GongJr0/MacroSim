@@ -251,8 +251,8 @@ class BaseVarModel:
             },
 
             'soft_guard_root': {
-                'julia': 'soft_guard_root(x) = sqrt(sqrt(x^2 + 1e-8))',
-                'sympy': lambda x: sp.sqrt(sp.sqrt(x^2 + 1e-8))
+                'julia': 'soft_guard_root(x::T) where {T<:Real} = sqrt(sqrt(x^2 + T(1e-6)))',
+                'sympy': lambda x: sp.sqrt(sp.sqrt(x**2 + 1e-6))
             },
 
             'exp': {

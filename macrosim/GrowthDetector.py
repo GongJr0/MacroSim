@@ -74,7 +74,7 @@ class GrowthDetector:
         lagged_df = lagged_df.dropna(how='any')
         return lagged_df
 
-    def get_base_var_growth(self, cv=5) -> None:
+    def get_base_var_growth(self, cv=5, **kwargs) -> None:
         base = self.base
         var_ls = self.base_vars
 
@@ -82,7 +82,7 @@ class GrowthDetector:
             series = base[var]
             bvm = BaseVarModel(series)
 
-            bvm.symbolic_model(cv=cv)
+            bvm.symbolic_model(cv=cv, **kwargs)
             estimator = bvm.model_select()
             estimator = GrowthEstimator(estimator, is_base=True)
 
@@ -106,8 +106,8 @@ class GrowthDetector:
                 estimator.fit(X, y)
                 self.estimators[var] = GrowthEstimator(model=estimator, is_base=False)
 
-    def compose_estimators(self, cv=5) -> dict[str, GrowthEstimator]:
-        self.get_base_var_growth(cv)
+    def compose_estimators(self, cv=5, **kwargs) -> dict[str, GrowthEstimator]:
+        self.get_base_var_growth(cv, **kwargs)
         self.get_non_base_var_growth()
 
         return self.estimators
@@ -134,13 +134,13 @@ class GrowthDetector:
             unary_operators=['exp',
                              'safe_log(x) = sign(x) * log(abs(x))',
                              'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
-                             'soft_guard_root(x) = sqrt(sqrt(x^2 + 1e-8))',
+                             'soft_guard_root(x::T) where {T<:Real} = sqrt(sqrt(x^2 + T(1e-6)))',
                              'inv(x)=1/x'],
             extra_sympy_mappings={
                 'inv': lambda x: 1/x,
                 'safe_log': lambda x: sp.sign(x) * sp.log(abs(x)),
                 'safe_sqrt': lambda x: sp.sign(x) * sp.sqrt(abs(x)),
-                'soft_guard_root': lambda x: sp.sqrt(sp.sqrt(x**2 + 1e-8)),
+                'soft_guard_root': lambda x: sp.sqrt(sp.sqrt(x**2 + 1e-6)),
             },
 
             # Constraints config
