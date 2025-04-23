@@ -131,15 +131,22 @@ class GrowthDetector:
 
             # Operations config
             binary_operators=['+', '-', '*', '/', '^'],
-            unary_operators=['exp', 'log', 'sqrt', 'inv(x)=1/x'],
-            extra_sympy_mappings={'inv': lambda x: 1/x},
+            unary_operators=['exp',
+                             'safe_log(x) = sign(x) * log(abs(x))',
+                             'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
+                             'inv(x)=1/x'],
+            extra_sympy_mappings={
+                'inv': lambda x: 1/x,
+                'safe_log': lambda x: sp.sign(x) * sp.log(abs(x)),
+                'safe_sqrt': lambda x: sp.sign(x) * sp.sqrt(abs(x)),
+            },
 
             # Constraints config
             constraints={
                 '^': {-1, 2},
                 'exp': 4,
-                'log': 4,
-                'sqrt': 2,
+                'safe_log': 4,
+                'safe_sqrt': 2,
                 'inv': -1
             },
 

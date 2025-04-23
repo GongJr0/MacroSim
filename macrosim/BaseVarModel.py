@@ -125,7 +125,7 @@ class BaseVarModel:
         lof_filtered = self.filtered
         is_seasonal = self.is_seasonal(self.var)
 
-        unary = self.EXTRA_UNARY_DEFAULT
+        unary = self.UNARY_DEFAULT | self.EXTRA_UNARY_DEFAULT
         constraints = self.CONSTRAINTS_DEFAULT
 
         if is_seasonal:
@@ -240,7 +240,20 @@ class BaseVarModel:
 
     @property
     def UNARY_DEFAULT(self):
-        return ['exp', 'log', 'sqrt']
+        return {
+            'safe_log': {
+                'julia': 'safe_log(x) = sign(x) * log(abs(x))',
+                'sympy': lambda x: sp.sign(x) * sp.log(abs(x))
+            },
+            'safe_sqrt': {
+                'julia': 'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
+                'sympy': lambda x: sp.sign(x) * sp.sqrt(abs(x))
+            },
+            'exp': {
+                'julia': 'exp',
+                'sympy': lambda x: sp.exp(x)
+            }
+        }
 
     @property
     def BINARY_DEFAULT(self):
