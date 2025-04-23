@@ -147,9 +147,9 @@ for _ in range(50):
 
 output_df = engine.get_history()
 ```
-As the first step, we defined the initial values and growth functions that will govern them as a tuple for each column. 
-will be inputted to the generator logic. We used the first index of our historical data (the most recent observations) to
-be able to compare our results with the real observations. (We could've used the most recent observations to simulate
+As the first step, we defined the initial values and the growth functions that will govern them as a tuple for each feature. 
+We used the first index of our historical data (the first observations) to
+be able to compare our simulatipn results with the real observations. (We could've used the latest observations to simulate
 future periods.) Then, an instance of `macrosim.SimEngine` was declared with the necessary parameters. The chosen
 entropy coefficient was 0.01 (this value defines the average extent of noise as a percentage of the variables) so we 
 expect to see shocks (noise) that's 1% of the values computed by the growth functions in both positive and negative 
