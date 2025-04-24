@@ -84,13 +84,14 @@ class GrowthDetector:
             bvm = BaseVarModel(series)
 
             bvm.symbolic_model(cv=cv, **kwargs)
-            sr_params = bvm.sr.get_params()
-            estimator = bvm.model_select()
+            fitted_estimator = bvm.model_select()
 
-            if isinstance(estimator, PySRRegressor):
-                out = estimator.get_best().to_frame().T
-            elif isinstance(estimator, RandomForestRegressor):
-                out = estimator
+            sr_params = None
+            if isinstance(fitted_estimator, PySRRegressor):
+                sr_params = bvm.sr.get_params()
+                out = fitted_estimator.get_best().to_frame().T
+            elif isinstance(fitted_estimator, RandomForestRegressor):
+                out = fitted_estimator
 
             return var, out, sr_params
         results = Parallel(n_jobs=-1)(
@@ -99,16 +100,16 @@ class GrowthDetector:
 
         for var, out, sr_params in results:
             if not isinstance(out, RandomForestRegressor):
-                feature_names = [f"X_t{n}" for n in range(1, self.n_lags(var)+1)]
+                feature_names = [f"X_t{n}" for n in range(1, self.n_lags(base[var])+1)]
                 label_name = 'X_t'
                 dummy_frame = pd.DataFrame(
                     np.zeros((1, len(feature_names) + 1)),  # 1 row, N+1 columns
-                    columns=[*feature_names, label_name]
+                    columns=[label_name, *feature_names]
                 )
 
                 sr = PySRRegressor()
                 sr.set_params(**sr_params)
-                sr.set_params(maxsize=7, niterations=1)  # type:ignore
+                sr.set_params(maxsize=7, niterations=1, verbosity=0)  # type:ignore
 
                 sr.fit(dummy_frame.drop(label_name, axis=1), dummy_frame[label_name])
                 sr.equations_ = out
@@ -144,15 +145,15 @@ class GrowthDetector:
         )
 
         for var, out in results:
-            feature_names = [*[f"X_t{n}" for n in range(1, self.n_lags(var) + 1)], *self.base_vars]
+            feature_names = [*[f"X_t{n}" for n in range(1, self.n_lags(self.df[var]) + 1)], *self.base_vars]
             label_name = 'X_t'
             dummy_frame = pd.DataFrame(
                 np.zeros((1, len(feature_names) + 1)),  # 1 row, N+1 columns
-                columns=[*feature_names, label_name]
+                columns=[label_name, *feature_names]
             )
 
             sr = self.sr_generator()
-            sr.set_params(maxsize=7, niterations=1)  # type:ignore
+            sr.set_params(maxsize=7, niterations=1, verbosity=0)  # type:ignore
 
             sr.fit(dummy_frame.drop(label_name, axis=1), dummy_frame[label_name])
             sr.equations_ = out
