@@ -166,6 +166,7 @@ class BaseVarModel:
                 random_state=kwargs.get('random_state', 0),
                 parallelism=kwargs.get('parallelism', 'serial'),  # type:ignore
                 batching=kwargs.get('batching', False),
+                verbosity=kwargs.get('verbosity', 0),
             )
 
             curr_sr.fit(X_train, y_train)
@@ -269,7 +270,11 @@ class BaseVarModel:
     def CONSTRAINTS_DEFAULT(self):
         return {
             '^': (-1, 3),
-            'atan': 3
+            'atan': 3,
+            'safe_log': 3,
+            'safe_sqrt': 2,
+            'soft_guard_root': 2,
+            'inv': -1
         }
 
     @property

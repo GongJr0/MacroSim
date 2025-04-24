@@ -76,11 +76,11 @@ class GrowthDetector:
         return lagged_df
 
     def get_base_var_growth(self, cv=5, **kwargs) -> None:
-        base = self.base
+        base_df = self.base
         var_ls = self.base_vars
 
-        def fit_variable(var):
-            series = base[var]
+        def fit_variable(var, df):
+            series = df[var]
             bvm = BaseVarModel(series)
 
             bvm.symbolic_model(cv=cv, **kwargs)
@@ -94,7 +94,7 @@ class GrowthDetector:
 
             return var, out, sr_params
         results = Parallel(n_jobs=-1)(
-            delayed(fit_variable)(var) for var in var_ls
+            delayed(fit_variable)(var, base_df) for var in var_ls
         )
 
         for var, out, sr_params in results:
@@ -114,7 +114,6 @@ class GrowthDetector:
                 sr.equations_ = out
 
                 estimator = GrowthEstimator(sr, is_base=True)
-                print(estimator)
 
             elif isinstance(out, RandomForestRegressor):
                 estimator = GrowthEstimator(out, is_base=True)
@@ -167,6 +166,7 @@ class GrowthDetector:
 
         return self.estimators
 
+    # WIP
     def serialize_estimators(self, file: str = "growth_estimators.pkl") -> None:
         with open(file, 'wb') as f:
             dump = (self, self.estimators)
@@ -200,10 +200,11 @@ class GrowthDetector:
 
             # Constraints config
             constraints={
-                '^': {-1, 2},
+                '^': (-1, 2),
                 'exp': 4,
-                'safe_log': 4,
+                'safe_log': 3,
                 'safe_sqrt': 2,
+                'soft_guard_root': 2,
                 'inv': -1
             },
 
@@ -218,7 +219,8 @@ class GrowthDetector:
             # Misc Params
             temp_equation_file=True,
             progress=False,
-            batching=True
+            batching=False,
+            verbosity=0
 
         )
         return sr
