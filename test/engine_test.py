@@ -1,3 +1,5 @@
+from pysr import PySRRegressor
+
 from macrosim.GrowthDetector import GrowthDetector
 from macrosim.SeriesAccessor import SeriesAccessor
 from macrosim.EqSearch import EqSearch
@@ -24,25 +26,28 @@ df = fred.get_series(
 gd = GrowthDetector(
     features=df.drop('RGDP', axis=1)
 )
-growth = gd.compose_estimators(cv=2, progress=True)
-print(growth)
-eqsr = EqSearch(
-    X=df.drop('RGDP', axis=1),
-    y=df['RGDP']
-)
-eqsr.distil_split()
-eqsr.search()
+growth = gd.compose_estimators(cv=2)
 
-init_params = {
-    var: (df[var].head(gd.get_lag_count), growth[var]) for var in df.drop('RGDP', axis=1).columns
-}
-engine = SimEngine(
-    sr=eqsr.get_model,
-    init_params=init_params,
-    n_lags=gd.get_lag_count
-)
+print(growth['LABPART'].get_best()['sympy_format'])
+print(growth['CPI'].get_best()['sympy_format'])
 
-out = engine.simulate(50)
-
-with open('out.pkl', 'wb') as f:
-    pickle.dump(out, f)  # type:ignore
+# eqsr = EqSearch(
+#     X=df.drop('RGDP', axis=1),
+#     y=df['RGDP']
+# )
+# eqsr.distil_split()
+# eqsr.search()
+#
+# init_params = {
+#     var: (df[var].head(gd.get_lag_count), growth[var]) for var in df.drop('RGDP', axis=1).columns
+# }
+# engine = SimEngine(
+#     sr=eqsr.get_model,
+#     init_params=init_params,
+#     n_lags=gd.get_lag_count
+# )
+#
+# out = engine.simulate(50)
+#
+# with open('out.pkl', 'wb') as f:
+#     pickle.dump(out, f)  # type:ignore
