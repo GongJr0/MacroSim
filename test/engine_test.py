@@ -21,17 +21,17 @@ df = fred.get_series(
     reindex_freq='QS'
 )
 
+gd = GrowthDetector(
+    features=df.drop('RGDP', axis=1)
+)
+growth = gd.compose_estimators(cv=2, progress=True)
+print(growth)
 eqsr = EqSearch(
     X=df.drop('RGDP', axis=1),
     y=df['RGDP']
 )
 eqsr.distil_split()
 eqsr.search()
-
-gd = GrowthDetector(
-    features=df.drop('RGDP', axis=1)
-)
-growth = gd.compose_estimators(cv=2, progress=True, batching=False)
 
 init_params = {
     var: (df[var].head(gd.get_lag_count), growth[var]) for var in df.drop('RGDP', axis=1).columns
