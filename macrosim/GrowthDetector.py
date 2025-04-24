@@ -1,3 +1,5 @@
+from sklearn.ensemble import RandomForestRegressor
+
 from macrosim.BaseVarSelector import BaseVarSelector
 from macrosim.BaseVarModel import BaseVarModel
 
@@ -37,7 +39,7 @@ class GrowthDetector:
     def __init__(self, features: pd.DataFrame) -> None:
 
         self.df = features
-        self.vars = features.columns
+        self.vars = features.columns.values
 
         self.bvs = BaseVarSelector(features)
         self.base = self.bvs.get_base_candidates()
@@ -52,19 +54,21 @@ class GrowthDetector:
             k: None for k in self.vars
         }
 
-    def lof_filter(self, series: pd.Series) -> pd.Series:
-        lag_count = self.n_lags(series)
+    @staticmethod
+    def lof_filter(series: pd.Series) -> pd.Series:
+        lag_count = GrowthDetector.n_lags(series)
 
         lof = LocalOutlierFactor(n_neighbors=lag_count)
         lof_mask = np.where(lof.fit_predict(series.to_frame()) == 1, True, False)
 
         return series[lof_mask]
 
-    def get_lags(self, series) -> pd.DataFrame:
+    @staticmethod
+    def get_lags(series) -> pd.DataFrame:
         lagged_df = series.to_frame()
         lagged_df.columns = ['X_t']
 
-        lags = self.n_lags(series)
+        lags = GrowthDetector.n_lags(series)
         for lag in range(1, lags + 1):
             lagged_df[f"X_t{lag}"] = lagged_df['X_t'].shift(lag)
 
@@ -80,40 +84,81 @@ class GrowthDetector:
             bvm = BaseVarModel(series)
 
             bvm.symbolic_model(cv=cv, **kwargs)
+            sr_params = bvm.sr.get_params()
             estimator = bvm.model_select()
-            estimator = GrowthEstimator(estimator, is_base=True)
 
-            return var, estimator
+            if isinstance(estimator, PySRRegressor):
+                out = estimator.get_best().to_frame().T
+            elif isinstance(estimator, RandomForestRegressor):
+                out = estimator
+
+            return var, out, sr_params
         results = Parallel(n_jobs=-1)(
             delayed(fit_variable)(var) for var in var_ls
         )
 
-        for var, estimator in results:
+        for var, out, sr_params in results:
+            if not isinstance(out, RandomForestRegressor):
+                feature_names = [f"X_t{n}" for n in range(1, self.n_lags(var)+1)]
+                label_name = 'X_t'
+                dummy_frame = pd.DataFrame(
+                    np.zeros((1, len(feature_names) + 1)),  # 1 row, N+1 columns
+                    columns=[*feature_names, label_name]
+                )
+
+                sr = PySRRegressor()
+                sr.set_params(**sr_params)
+                sr.set_params(maxsize=7, niterations=1)  # type:ignore
+
+                sr.fit(dummy_frame.drop(label_name, axis=1), dummy_frame[label_name])
+                sr.equations_ = out
+
+                estimator = GrowthEstimator(sr, is_base=True)
+                print(estimator)
+
+            elif isinstance(out, RandomForestRegressor):
+                estimator = GrowthEstimator(out, is_base=True)
+
             self.base_estimators[var] = estimator
             self.estimators[var] = estimator
 
     def get_non_base_var_growth(self) -> None:
         base = self.base
 
-        def fit_non_base_var(var):
-            estimator = self.sr_generator()
-            filtered = self.lof_filter(self.df[var])
+        def fit_non_base_var(var, df):
+            sr = GrowthDetector.sr_generator()
+            filtered = GrowthDetector.lof_filter(df[var])
 
-            lags = self.get_lags(filtered)
+            lags = GrowthDetector.get_lags(filtered)
             base_index_matched = base.loc[lags.index, :]
 
             X = pd.concat([lags.drop('X_t', axis=1), base_index_matched], axis=1)
             y = lags['X_t']
 
-            estimator.fit(X, y)
-            return var, GrowthEstimator(model=estimator, is_base=False)
+            sr.fit(X, y)
+            out = sr.get_best().to_frame().T
+            return var, out
 
         results = Parallel(n_jobs=-1)(
-            delayed(fit_non_base_var)(var)
+            delayed(fit_non_base_var)(var, self.df)
             for var in self.vars if var not in self.base_vars
         )
 
-        for var, estimator in results:
+        for var, out in results:
+            feature_names = [*[f"X_t{n}" for n in range(1, self.n_lags(var) + 1)], *self.base_vars]
+            label_name = 'X_t'
+            dummy_frame = pd.DataFrame(
+                np.zeros((1, len(feature_names) + 1)),  # 1 row, N+1 columns
+                columns=[*feature_names, label_name]
+            )
+
+            sr = self.sr_generator()
+            sr.set_params(maxsize=7, niterations=1)  # type:ignore
+
+            sr.fit(dummy_frame.drop(label_name, axis=1), dummy_frame[label_name])
+            sr.equations_ = out
+
+            estimator = GrowthEstimator(sr, is_base=False)
             self.estimators[var] = estimator
 
     def compose_estimators(self, cv=5, **kwargs) -> dict[str, GrowthEstimator]:

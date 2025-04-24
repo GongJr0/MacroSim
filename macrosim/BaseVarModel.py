@@ -165,7 +165,7 @@ class BaseVarModel:
                 deterministic=kwargs.get('deterministic', True),
                 random_state=kwargs.get('random_state', 0),
                 parallelism=kwargs.get('parallelism', 'serial'),  # type:ignore
-                batching=kwargs.get('batching', True),
+                batching=kwargs.get('batching', False),
             )
 
             curr_sr.fit(X_train, y_train)
