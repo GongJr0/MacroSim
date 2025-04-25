@@ -46,6 +46,9 @@ class GrowthDetector:
         self.base_vars = self.base.columns.values
         self.non_base_vars = [var for var in self.vars if var not in self.base_vars]
 
+        self.base_kwargs = {}
+        self.non_base_kwargs = {}
+
         self.base_estimators: dict[str, GrowthEstimator | None] = {
             k: None for k in self.base.columns
         }
@@ -55,8 +58,8 @@ class GrowthDetector:
         }
 
     @staticmethod
-    def lof_filter(series: pd.Series) -> pd.Series:
-        lag_count = GrowthDetector.n_lags(series)
+    def _lof_filter(series: pd.Series) -> pd.Series:
+        lag_count = GrowthDetector._n_lags(series)
 
         lof = LocalOutlierFactor(n_neighbors=lag_count)
         lof_mask = np.where(lof.fit_predict(series.to_frame()) == 1, True, False)
@@ -64,18 +67,18 @@ class GrowthDetector:
         return series[lof_mask]
 
     @staticmethod
-    def get_lags(series) -> pd.DataFrame:
+    def _get_lags(series) -> pd.DataFrame:
         lagged_df = series.to_frame()
         lagged_df.columns = ['X_t']
 
-        lags = GrowthDetector.n_lags(series)
+        lags = GrowthDetector._n_lags(series)
         for lag in range(1, lags + 1):
             lagged_df[f"X_t{lag}"] = lagged_df['X_t'].shift(lag)
 
         lagged_df = lagged_df.dropna(how='any')
         return lagged_df
 
-    def get_base_var_growth(self, cv=5, **kwargs) -> None:
+    def _get_base_var_growth(self, cv=5, **kwargs) -> None:
         base_df = self.base
         var_ls = self.base_vars
 
@@ -100,7 +103,7 @@ class GrowthDetector:
 
         for var, out, sr_params in results:
             if not isinstance(out, RandomForestRegressor):
-                feature_names = [f"X_t{n}" for n in range(1, self.n_lags(base[var])+1)]
+                feature_names = [f"X_t{n}" for n in range(1, self._n_lags(base_df[var])+1)]
                 label_name = 'X_t'
                 dummy_frame = pd.DataFrame(
                     np.zeros((1, len(feature_names) + 1)),  # 1 row, N+1 columns
@@ -122,14 +125,15 @@ class GrowthDetector:
             self.base_estimators[var] = estimator
             self.estimators[var] = estimator
 
-    def get_non_base_var_growth(self) -> None:
+    def _get_non_base_var_growth(self, **kwargs) -> None:
         base = self.base
 
         def fit_non_base_var(var, df):
             sr = GrowthDetector.sr_generator()
-            filtered = GrowthDetector.lof_filter(df[var])
+            sr.set_params(**kwargs)
+            filtered = GrowthDetector._lof_filter(df[var])
 
-            lags = GrowthDetector.get_lags(filtered)
+            lags = GrowthDetector._get_lags(filtered)
             base_index_matched = base.loc[lags.index, :]
 
             X = pd.concat([lags.drop('X_t', axis=1), base_index_matched], axis=1)
@@ -145,14 +149,14 @@ class GrowthDetector:
         )
 
         for var, out in results:
-            feature_names = [*[f"X_t{n}" for n in range(1, self.n_lags(self.df[var]) + 1)], *self.base_vars]
+            feature_names = [*[f"X_t{n}" for n in range(1, self._n_lags(self.df[var]) + 1)], *self.base_vars]
             label_name = 'X_t'
             dummy_frame = pd.DataFrame(
                 np.zeros((1, len(feature_names) + 1)),  # 1 row, N+1 columns
                 columns=[label_name, *feature_names]
             )
 
-            sr = self.sr_generator()
+            sr = self._sr_generator()
             sr.set_params(maxsize=7, niterations=1, verbosity=0)  # type:ignore
 
             sr.fit(dummy_frame.drop(label_name, axis=1), dummy_frame[label_name])
@@ -161,9 +165,16 @@ class GrowthDetector:
             estimator = GrowthEstimator(sr, is_base=False)
             self.estimators[var] = estimator
 
-    def compose_estimators(self, cv=5, **kwargs) -> dict[str, GrowthEstimator]:
-        self.get_base_var_growth(cv, **kwargs)
-        self.get_non_base_var_growth()
+    def base_estimator_kwargs(self, **kwargs) -> None:
+        self.base_kwargs = kwargs
+
+    def non_base_estimator_kwargs(self, **kwargs) -> None:
+        self.non_base_kwargs = kwargs
+
+    def compose_estimators(self, cv=5) -> dict[str, GrowthEstimator]:
+
+        self._get_base_var_growth(cv, **self.base_kwargs)
+        self._get_non_base_var_growth(**self.non_base_kwargs)
 
         return self.estimators
 
@@ -174,11 +185,11 @@ class GrowthDetector:
             pickle.dump(dump, f)
 
     @staticmethod
-    def n_lags(series):
+    def _n_lags(series):
         return int(np.ceil(len(series)**(1/3)))
 
     @staticmethod
-    def sr_generator():
+    def _sr_generator():
         sr = PySRRegressor(
             # Search method config
             model_selection='accuracy',
@@ -233,5 +244,5 @@ class GrowthDetector:
         }
 
     @property
-    def get_lag_count(self) -> int:
-        return self.n_lags(self.df)
+    def _get_lag_count(self) -> int:
+        return self._n_lags(self.df)
