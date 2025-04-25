@@ -1,19 +1,18 @@
+from sklearn.ensemble import RandomForestRegressor
+
 from macrosim.BaseVarSelector import BaseVarSelector
 from macrosim.BaseVarModel import BaseVarModel
 
 from pysr import PySRRegressor
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import LocalOutlierFactor
 
 import pandas as pd
 import numpy as np
 
-import scipy.optimize as opt
-from typing import Callable, Any
-
 import sympy as sp
 
 import pickle
+from joblib import Parallel, delayed
 
 
 class GrowthEstimator:
@@ -40,12 +39,15 @@ class GrowthDetector:
     def __init__(self, features: pd.DataFrame) -> None:
 
         self.df = features
-        self.vars = features.columns
+        self.vars = features.columns.values
 
         self.bvs = BaseVarSelector(features)
         self.base = self.bvs.get_base_candidates()
         self.base_vars = self.base.columns.values
         self.non_base_vars = [var for var in self.vars if var not in self.base_vars]
+
+        self._base_kwargs = {}
+        self._non_base_kwargs = {}
 
         self.base_estimators: dict[str, GrowthEstimator | None] = {
             k: None for k in self.base.columns
@@ -55,74 +57,139 @@ class GrowthDetector:
             k: None for k in self.vars
         }
 
-    def lof_filter(self, series: pd.Series) -> pd.Series:
-        lag_count = self.n_lags(series)
+    @staticmethod
+    def _lof_filter(series: pd.Series) -> pd.Series:
+        lag_count = GrowthDetector._n_lags(series)
 
         lof = LocalOutlierFactor(n_neighbors=lag_count)
         lof_mask = np.where(lof.fit_predict(series.to_frame()) == 1, True, False)
 
         return series[lof_mask]
 
-    def get_lags(self, series) -> pd.DataFrame:
+    @staticmethod
+    def _get_lags(series) -> pd.DataFrame:
         lagged_df = series.to_frame()
         lagged_df.columns = ['X_t']
 
-        lags = self.n_lags(series)
+        lags = GrowthDetector._n_lags(series)
         for lag in range(1, lags + 1):
             lagged_df[f"X_t{lag}"] = lagged_df['X_t'].shift(lag)
 
         lagged_df = lagged_df.dropna(how='any')
         return lagged_df
 
-    def get_base_var_growth(self, cv=5, **kwargs) -> None:
-        base = self.base
+    def _get_base_var_growth(self, cv=5, **kwargs) -> None:
+        base_df = self.base
         var_ls = self.base_vars
 
-        for var in var_ls:
-            series = base[var]
+        def fit_variable(var, df):
+            series = df[var]
             bvm = BaseVarModel(series)
 
             bvm.symbolic_model(cv=cv, **kwargs)
-            estimator = bvm.model_select()
-            estimator = GrowthEstimator(estimator, is_base=True)
+            fitted_estimator = bvm.model_select()
+
+            sr_params = None
+            if isinstance(fitted_estimator, PySRRegressor):
+                sr_params = bvm.sr.get_params()
+                out = fitted_estimator.get_best().to_frame().T
+            elif isinstance(fitted_estimator, RandomForestRegressor):
+                out = fitted_estimator
+
+            return var, out, sr_params
+        results = Parallel(n_jobs=-1)(
+            delayed(fit_variable)(var, base_df) for var in var_ls
+        )
+
+        for var, out, sr_params in results:
+            if not isinstance(out, RandomForestRegressor):
+                feature_names = [f"X_t{n}" for n in range(1, self._n_lags(base_df[var])+1)]
+                label_name = 'X_t'
+                dummy_frame = pd.DataFrame(
+                    np.zeros((1, len(feature_names) + 1)),  # 1 row, N+1 columns
+                    columns=[label_name, *feature_names]
+                )
+
+                sr = PySRRegressor()
+                sr.set_params(**sr_params)
+                sr.set_params(maxsize=7, niterations=1, verbosity=0)  # type:ignore
+
+                sr.fit(dummy_frame.drop(label_name, axis=1), dummy_frame[label_name])
+                sr.equations_ = out
+
+                estimator = GrowthEstimator(sr, is_base=True)
+
+            elif isinstance(out, RandomForestRegressor):
+                estimator = GrowthEstimator(out, is_base=True)
 
             self.base_estimators[var] = estimator
             self.estimators[var] = estimator
 
-    def get_non_base_var_growth(self) -> None:
+    def _get_non_base_var_growth(self, **kwargs) -> None:
         base = self.base
 
-        for var in self.vars:
-            if var not in self.base_vars:
-                estimator = self.sr_generator()
-                filtered = self.lof_filter(self.df[var])
+        def fit_non_base_var(var, df):
+            sr = GrowthDetector._sr_generator()
+            sr.set_params(**kwargs)
+            filtered = GrowthDetector._lof_filter(df[var])
 
-                lags = self.get_lags(filtered)
-                base_index_matched = base.loc[lags.index, :]
+            lags = GrowthDetector._get_lags(filtered)
+            base_index_matched = base.loc[lags.index, :]
 
-                X = pd.concat([lags.drop('X_t', axis=1), base_index_matched], axis=1)
-                y = lags['X_t']
+            X = pd.concat([lags.drop('X_t', axis=1), base_index_matched], axis=1)
+            y = lags['X_t']
 
-                estimator.fit(X, y)
-                self.estimators[var] = GrowthEstimator(model=estimator, is_base=False)
+            sr.fit(X, y)
+            out = sr.get_best().to_frame().T
+            return var, out
 
-    def compose_estimators(self, cv=5, **kwargs) -> dict[str, GrowthEstimator]:
-        self.get_base_var_growth(cv, **kwargs)
-        self.get_non_base_var_growth()
+        results = Parallel(n_jobs=-1)(
+            delayed(fit_non_base_var)(var, self.df)
+            for var in self.vars if var not in self.base_vars
+        )
+
+        for var, out in results:
+            feature_names = [*[f"X_t{n}" for n in range(1, self._n_lags(self.df[var]) + 1)], *self.base_vars]
+            label_name = 'X_t'
+            dummy_frame = pd.DataFrame(
+                np.zeros((1, len(feature_names) + 1)),  # 1 row, N+1 columns
+                columns=[label_name, *feature_names]
+            )
+
+            sr = self._sr_generator()
+            sr.set_params(maxsize=7, niterations=1, verbosity=0)  # type:ignore
+
+            sr.fit(dummy_frame.drop(label_name, axis=1), dummy_frame[label_name])
+            sr.equations_ = out
+
+            estimator = GrowthEstimator(sr, is_base=False)
+            self.estimators[var] = estimator
+
+    def base_estimator_kwargs(self, **kwargs) -> None:
+        self._base_kwargs = kwargs
+
+    def non_base_estimator_kwargs(self, **kwargs) -> None:
+        self._non_base_kwargs = kwargs
+
+    def compose_estimators(self, cv=5) -> dict[str, GrowthEstimator]:
+
+        self._get_base_var_growth(cv, **self._base_kwargs)
+        self._get_non_base_var_growth(**self._non_base_kwargs)
 
         return self.estimators
 
+    # WIP
     def serialize_estimators(self, file: str = "growth_estimators.pkl") -> None:
         with open(file, 'wb') as f:
             dump = (self, self.estimators)
             pickle.dump(dump, f)
 
     @staticmethod
-    def n_lags(series):
+    def _n_lags(series):
         return int(np.ceil(len(series)**(1/3)))
 
     @staticmethod
-    def sr_generator():
+    def _sr_generator():
         sr = PySRRegressor(
             # Search method config
             model_selection='accuracy',
@@ -145,10 +212,11 @@ class GrowthDetector:
 
             # Constraints config
             constraints={
-                '^': {-1, 2},
+                '^': (-1, 2),
                 'exp': 4,
-                'safe_log': 4,
+                'safe_log': 3,
                 'safe_sqrt': 2,
+                'soft_guard_root': 2,
                 'inv': -1
             },
 
@@ -163,7 +231,8 @@ class GrowthDetector:
             # Misc Params
             temp_equation_file=True,
             progress=False,
-            batching=True
+            batching=False,
+            verbosity=0
 
         )
         return sr
@@ -175,5 +244,5 @@ class GrowthDetector:
         }
 
     @property
-    def get_lag_count(self) -> int:
-        return self.n_lags(self.df)
+    def _get_lag_count(self) -> int:
+        return self._n_lags(self.df)
