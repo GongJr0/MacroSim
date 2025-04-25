@@ -26,6 +26,9 @@ df = fred.get_series(
 gd = GrowthDetector(
     features=df.drop('RGDP', axis=1)
 )
+gd.base_estimator_kwargs(verbosity=0, batching=False)
+gd.non_base_estimator_kwargs(verbosity=0, batching=False)
+
 growth = gd.compose_estimators(cv=2)
 
 eqsr = EqSearch(
@@ -36,12 +39,12 @@ eqsr.distil_split()
 eqsr.search(maxsize=16, niterations=250)
 
 init_params = {
-    var: (df[var].head(gd.get_lag_count), growth[var]) for var in df.drop('RGDP', axis=1).columns
+    var: (df[var].head(gd._get_lag_count), growth[var]) for var in df.drop('RGDP', axis=1).columns
 }
 engine = SimEngine(
     sr=eqsr.get_model,
     init_params=init_params,
-    n_lags=gd.get_lag_count
+    n_lags=gd._get_lag_count
 )
 
 out = engine.simulate(50)
