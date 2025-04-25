@@ -46,8 +46,8 @@ class GrowthDetector:
         self.base_vars = self.base.columns.values
         self.non_base_vars = [var for var in self.vars if var not in self.base_vars]
 
-        self.base_kwargs = {}
-        self.non_base_kwargs = {}
+        self._base_kwargs = {}
+        self._non_base_kwargs = {}
 
         self.base_estimators: dict[str, GrowthEstimator | None] = {
             k: None for k in self.base.columns
@@ -129,7 +129,7 @@ class GrowthDetector:
         base = self.base
 
         def fit_non_base_var(var, df):
-            sr = GrowthDetector.sr_generator()
+            sr = GrowthDetector._sr_generator()
             sr.set_params(**kwargs)
             filtered = GrowthDetector._lof_filter(df[var])
 
@@ -166,15 +166,15 @@ class GrowthDetector:
             self.estimators[var] = estimator
 
     def base_estimator_kwargs(self, **kwargs) -> None:
-        self.base_kwargs = kwargs
+        self._base_kwargs = kwargs
 
     def non_base_estimator_kwargs(self, **kwargs) -> None:
-        self.non_base_kwargs = kwargs
+        self._non_base_kwargs = kwargs
 
     def compose_estimators(self, cv=5) -> dict[str, GrowthEstimator]:
 
-        self._get_base_var_growth(cv, **self.base_kwargs)
-        self._get_non_base_var_growth(**self.non_base_kwargs)
+        self._get_base_var_growth(cv, **self._base_kwargs)
+        self._get_non_base_var_growth(**self._non_base_kwargs)
 
         return self.estimators
 
