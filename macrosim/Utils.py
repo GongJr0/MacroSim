@@ -12,14 +12,17 @@ class DataUtils:
     """Static Class for data transformation utilities"""
 
     @staticmethod
-    def lof_filter(series: pd.Series, n_neighbors: Optional[int] = None) -> pd.Series:
+    def lof_filter(series: pd.Series | pd.DataFrame, n_neighbors: Optional[int] = None) -> pd.Series:
         """
         Local Outlier Factor (LOF) based outlier removal util. Returns the unfiltered series if LOF removes more than
         25% of the data.
-        :param series: pd.Series object
+        :param series: pd.Series object or a single column pd.DataFrame
         :param n_neighbors: Size of neighborhood to use for outlier removal
         :return: filtered pd.Series object
         """
+        if isinstance(series, pd.Series):
+            series = series.to_frame()
+            
         n = n_neighbors or int(np.floor(np.sqrt(len(series))))
         lof = LocalOutlierFactor(n_neighbors=n, contamination='auto')
         lof_mask = np.where(lof.fit_predict(series) == -1, True, False)
