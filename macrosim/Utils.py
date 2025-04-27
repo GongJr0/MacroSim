@@ -27,8 +27,8 @@ class DataUtils:
         lof = LocalOutlierFactor(n_neighbors=n, contamination='auto')
         lof_mask = np.where(lof.fit_predict(series) == -1, True, False)
 
-        filtered = series[lof_mask]
-        return filtered if len(filtered) >= .75 * len(series) else series
+        filtered = pd.Series(series[lof_mask])
+        return filtered if len(filtered) >= .75 * len(series) else pd.Series(series)
 
     @staticmethod
     def ma_smoothing(series: pd.Series, window: Optional[int] = None) -> pd.Series:
