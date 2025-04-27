@@ -50,7 +50,7 @@ DEFAULT_CONSTRAINTS = {
         'inv': -1
 }
 
-DEFAULT_SR_COFING_EQ_SEARCH = SrConfig(
+DEFAULT_SR_CONFIG_EQ_SEARCH = SrConfig(
                     model_selection='accuracy',
                     maxsize=32,
                     niterations=300,
@@ -168,11 +168,11 @@ class EqSearch:
         unary = DEFAULT_UNARY | extra_unary_ops
         constraints = DEFAULT_CONSTRAINTS | constraints
 
-        cfg = replace(DEFAULT_SR_COFING_EQ_SEARCH,
+        cfg = replace(DEFAULT_SR_CONFIG_EQ_SEARCH,
                       unary_operators=[item['julia'] for item in unary.values()],
                       extra_sympy_mappings={item[0]: item[1]['sympy'] for item in unary.items()},
                       constraints=constraints,
-                      elementwise_loss=custom_loss or DEFAULT_SR_COFING_EQ_SEARCH.elementwise_loss
+                      elementwise_loss=custom_loss or DEFAULT_SR_CONFIG_EQ_SEARCH.elementwise_loss
                       )
 
         if cv > 1:
