@@ -20,15 +20,17 @@ class DataUtils:
         :param n_neighbors: Size of neighborhood to use for outlier removal
         :return: filtered pd.Series object
         """
-        if isinstance(series, pd.Series):
-            series = series.to_frame()
-            
         n = n_neighbors or int(np.floor(np.sqrt(len(series))))
         lof = LocalOutlierFactor(n_neighbors=n, contamination='auto')
-        lof_mask = np.where(lof.fit_predict(series) == -1, True, False)
 
-        filtered = pd.Series(series[lof_mask])
-        return filtered if len(filtered) >= .75 * len(series) else pd.Series(series)
+        # LocalOutlierFilter expects a DataFrame input
+        if isinstance(series, pd.Series):
+            lof_mask = np.where(lof.fit_predict(series.to_frame()) == -1, True, False)
+        else:
+            lof_mask = np.where(lof.fit_predict(series) == -1, True, False)
+
+        filtered = series[lof_mask]
+        return filtered if len(filtered) >= (.75 * len(series)) else series
 
     @staticmethod
     def ma_smoothing(series: pd.Series, window: Optional[int] = None) -> pd.Series:
@@ -599,7 +601,7 @@ class SrConfig:
     input_stream: str = "stdin"
     run_id: str | None = None
     output_directory: str | None = None
-    temp_equation_file: bool = False
+    temp_equation_file: bool = True
     tempdir: str | None = None
     delete_tempfiles: bool = True
     update: bool = False
