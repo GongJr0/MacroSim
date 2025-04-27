@@ -71,7 +71,7 @@ class DataUtils:
         return lagged_df
 
 
-@dataclass
+@dataclass(frozen=True)
 class SrConfig:
     """
     Kwargs container for PySRRegressor instances.

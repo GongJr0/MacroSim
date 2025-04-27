@@ -20,7 +20,7 @@ from dataclasses import replace
 
 DEFAULT_SR_CONFIG_NON_BASE = SrConfig(
     # Search method config
-    model_selection='accuracy',
+    model_selection='best',
     maxsize=16,
     niterations=100,
 
@@ -227,4 +227,3 @@ class GrowthDetector:
     @property
     def get_lag_count(self) -> int:
         return self._n_lags(self.df)
-    
