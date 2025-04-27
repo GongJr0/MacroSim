@@ -2,6 +2,8 @@ from sklearn.ensemble import RandomForestRegressor
 
 from macrosim.BaseVarSelector import BaseVarSelector
 from macrosim.BaseVarModel import BaseVarModel
+from macrosim.Utils import SrConfig, sr_generator
+from macrosim.Utils import DataUtils as du
 
 from pysr import PySRRegressor
 from sklearn.neighbors import LocalOutlierFactor
@@ -13,6 +15,53 @@ import sympy as sp
 
 import pickle
 from joblib import Parallel, delayed
+
+from dataclasses import replace
+
+DEFAULT_SR_CONFIG_NON_BASE = SrConfig(
+    # Search method config
+    model_selection='accuracy',
+    maxsize=16,
+    niterations=100,
+
+    # Operations config
+    binary_operators=['+', '-', '*', '/', '^'],
+    unary_operators=['exp',
+                     'safe_log(x) = sign(x) * log(abs(x))',
+                     'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
+                     'soft_guard_root(x::T) where {T<:Real} = sqrt(sqrt(x^2 + T(1e-6)))',
+                     'inv(x)=1/x'],
+    extra_sympy_mappings={
+        'inv': lambda x: 1/x,
+        'safe_log': lambda x: sp.sign(x) * sp.log(abs(x)),
+        'safe_sqrt': lambda x: sp.sign(x) * sp.sqrt(abs(x)),
+        'soft_guard_root': lambda x: sp.sqrt(sp.sqrt(x**2 + 1e-6)),
+    },
+
+    # Constraints config
+    constraints={
+        '^': (-1, 2),
+        'exp': 4,
+        'safe_log': 3,
+        'safe_sqrt': 2,
+        'soft_guard_root': 2,
+        'inv': -1
+    },
+
+    # Loss config
+    elementwise_loss='L2DistLoss()',
+
+    # Search Deterministic Behavior Config
+    deterministic=True,
+    parallelism='serial',
+    random_state=0,
+
+    # Misc Params
+    temp_equation_file=True,
+    progress=False,
+    batching=False,
+    verbosity=0
+)
 
 
 class GrowthEstimator:
@@ -56,27 +105,6 @@ class GrowthDetector:
         self.estimators: dict[str, GrowthEstimator | None] = {
             k: None for k in self.vars
         }
-
-    @staticmethod
-    def _lof_filter(series: pd.Series) -> pd.Series:
-        lag_count = GrowthDetector._n_lags(series)
-
-        lof = LocalOutlierFactor(n_neighbors=lag_count)
-        lof_mask = np.where(lof.fit_predict(series.to_frame()) == 1, True, False)
-
-        return series[lof_mask]
-
-    @staticmethod
-    def _get_lags(series) -> pd.DataFrame:
-        lagged_df = series.to_frame()
-        lagged_df.columns = ['X_t']
-
-        lags = GrowthDetector._n_lags(series)
-        for lag in range(1, lags + 1):
-            lagged_df[f"X_t{lag}"] = lagged_df['X_t'].shift(lag)
-
-        lagged_df = lagged_df.dropna(how='any')
-        return lagged_df
 
     def _get_base_var_growth(self, cv=5, **kwargs) -> None:
         base_df = self.base
@@ -129,11 +157,12 @@ class GrowthDetector:
         base = self.base
 
         def fit_non_base_var(var, df):
-            sr = GrowthDetector._sr_generator()
-            sr.set_params(**kwargs)
-            filtered = GrowthDetector._lof_filter(df[var])
+            cfg = replace(DEFAULT_SR_CONFIG_NON_BASE, **(kwargs or {}))
+            sr = sr_generator(config=cfg)
 
-            lags = GrowthDetector._get_lags(filtered)
+            filtered = du.lof_filter(df[var])
+
+            lags = du.get_lags(filtered)
             base_index_matched = base.loc[lags.index, :]
 
             X = pd.concat([lags.drop('X_t', axis=1), base_index_matched], axis=1)
@@ -156,8 +185,9 @@ class GrowthDetector:
                 columns=[label_name, *feature_names]
             )
 
-            sr = self._sr_generator()
-            sr.set_params(maxsize=7, niterations=1, verbosity=0)  # type:ignore
+            sr = sr_generator(
+                SrConfig(maxsize=7, niterations=1, verbosity=0)
+            )
 
             sr.fit(dummy_frame.drop(label_name, axis=1), dummy_frame[label_name])
             sr.equations_ = out
@@ -188,55 +218,6 @@ class GrowthDetector:
     def _n_lags(series):
         return int(np.ceil(len(series)**(1/3)))
 
-    @staticmethod
-    def _sr_generator():
-        sr = PySRRegressor(
-            # Search method config
-            model_selection='accuracy',
-            maxsize=16,
-            niterations=100,
-
-            # Operations config
-            binary_operators=['+', '-', '*', '/', '^'],
-            unary_operators=['exp',
-                             'safe_log(x) = sign(x) * log(abs(x))',
-                             'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
-                             'soft_guard_root(x::T) where {T<:Real} = sqrt(sqrt(x^2 + T(1e-6)))',
-                             'inv(x)=1/x'],
-            extra_sympy_mappings={
-                'inv': lambda x: 1/x,
-                'safe_log': lambda x: sp.sign(x) * sp.log(abs(x)),
-                'safe_sqrt': lambda x: sp.sign(x) * sp.sqrt(abs(x)),
-                'soft_guard_root': lambda x: sp.sqrt(sp.sqrt(x**2 + 1e-6)),
-            },
-
-            # Constraints config
-            constraints={
-                '^': (-1, 2),
-                'exp': 4,
-                'safe_log': 3,
-                'safe_sqrt': 2,
-                'soft_guard_root': 2,
-                'inv': -1
-            },
-
-            # Loss config
-            elementwise_loss='L2DistLoss()',
-
-            # Search Deterministic Behavior Config
-            deterministic=True,
-            parallelism='serial',
-            random_state=0,
-
-            # Misc Params
-            temp_equation_file=True,
-            progress=False,
-            batching=False,
-            verbosity=0
-
-        )
-        return sr
-
     @property
     def IS_BASE(self):
         return {
@@ -244,5 +225,6 @@ class GrowthDetector:
         }
 
     @property
-    def _get_lag_count(self) -> int:
+    def get_lag_count(self) -> int:
         return self._n_lags(self.df)
+    
