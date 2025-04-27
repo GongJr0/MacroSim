@@ -4,6 +4,10 @@ import numpy as np
 import sympy as sp
 import pandas as pd
 
+from macrosim.Utils import DataUtils as du
+from macrosim.Utils import SrConfig, sr_generator
+from dataclasses import replace
+
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split, GridSearchCV, KFold
@@ -13,6 +17,102 @@ from statsmodels.tsa.stattools import acf
 from scipy.signal import periodogram
 
 from typing import Optional, Any, Callable
+
+EXTRA_UNARY_DEFAULT = {
+        'inv': {
+            'julia': 'inv(x)=1/x',
+            'sympy': lambda x: 1/x
+        },
+
+        'atan': {
+            'julia': 'atan',
+            'sympy': lambda x: sp.atan(x)
+        }
+    }
+
+EXTRA_UNARY_SEASONAL = {
+        'sin': {
+            'julia': 'sin',
+            'sympy': lambda x: sp.sin(x)
+        },
+
+        'sin2': {
+            'julia': 'sin2(x)=sin(x)^2',
+            'sympy': lambda x: sp.sin(x)**2
+        },
+
+        'tan': {
+            'julia': 'tan',
+            'sympy': lambda x: sp.tan(x)
+        },
+
+        'tan2': {
+            'julia': 'tan2(x)=tan(x)^2',
+            'sympy': lambda x: sp.tan(x)**2
+        }
+    }
+
+UNARY_DEFAULT = {
+        'safe_log': {
+            'julia': 'safe_log(x) = sign(x) * log(abs(x))',
+            'sympy': lambda x: sp.sign(x) * sp.log(abs(x))
+        },
+        'safe_sqrt': {
+            'julia': 'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
+            'sympy': lambda x: sp.sign(x) * sp.sqrt(abs(x))
+        },
+
+        'soft_guard_root': {
+            'julia': 'soft_guard_root(x::T) where {T<:Real} = sqrt(sqrt(x^2 + T(1e-6)))',
+            'sympy': lambda x: sp.sqrt(sp.sqrt(x**2 + 1e-6))
+        },
+
+        'exp': {
+            'julia': 'exp',
+            'sympy': lambda x: sp.exp(x)
+        }
+    }
+
+
+BINARY_DEFAULT = ['+', '-', '/', '*', '^']
+
+CONSTRAINTS_DEFAULT = {
+        '^': (-1, 3),
+        'atan': 3,
+        'safe_log': 3,
+        'safe_sqrt': 2,
+        'soft_guard_root': 2,
+        'inv': -1
+    }
+
+CONSTRAINTS_SEASONAL = {
+        'sin': 2,
+        'sin2': 2,
+        'tan': 2,
+        'tan2': 2
+    }
+
+DEFAULT_SR_CONFIG_BASE = SrConfig(
+                model_selection='accuracy',  # type:ignore
+
+                niterations=300,
+                maxsize=32,
+
+                binary_operators=BINARY_DEFAULT,
+                unary_operators=[item['julia'] for item in (UNARY_DEFAULT | EXTRA_UNARY_DEFAULT).values()],
+                extra_sympy_mappings={item[0]: item[1]['sympy'] for item in (UNARY_DEFAULT | EXTRA_UNARY_DEFAULT).items()},
+
+                constraints=CONSTRAINTS_DEFAULT,
+                elementwise_loss='L2DistLoss()',
+                progress=False,
+                temp_equation_file=True,
+
+                deterministic=True,
+                random_state=0,
+                parallelism='serial',  # type:ignore
+                batching=False,
+                verbosity=0,
+            )
 
 
 class BaseVarModel:
@@ -29,17 +129,7 @@ class BaseVarModel:
         self.rf_loss: int | None = None
 
         self.n_lags_func = lag_count_descriptor if lag_count_descriptor is not None else self.DEFAULT_LAG_COUNT
-        self.filtered = self.lof_filter()
-
-    def lof_filter(self):
-        n = int(np.floor(np.sqrt(len(self.var))))
-        lof = LocalOutlierFactor(n_neighbors=n, contamination='auto')
-        lof_mask = np.where(lof.fit_predict(self.var.to_frame()) == -1, True, False)
-
-        filtered = self.var[lof_mask]
-        if len(filtered) <= len(self.var)*0.75:  # LOF removes around 90% of rows sometimes (probably due to a bug)
-            return self.var
-        return filtered
+        self.filtered = du.lof_filter(self.var)
 
     def get_seasonal_freq(self) -> int | None:
         # Compute ACF with a reasonable maximum lag (half of the series length)
@@ -65,35 +155,25 @@ class BaseVarModel:
 
         if len(series) < 24:  # High likelihood of overfitting for short series
             return False
+        window = int(np.ceil(len(series)**(1/3)))
 
-        detrended = series - pd.Series(series).rolling(window=5, center=True).mean()
+        detrended = series - pd.Series(series).rolling(window=window, center=True).mean()
         detrended = detrended.dropna()
 
         autocorr = acf(detrended, fft=True, nlags=min(100, len(detrended) // 2))
         acf_peaks = (autocorr[1:] > 0.5).sum()  # Ignore lag 0, count strong spikes
 
         freqs, power = periodogram(detrended, scaling='spectrum')
-        power_threshold = np.mean(power) + 3 * np.std(power)
+        power_threshold = np.mean(power) + 3 * np.std(power)  # type:ignore
         dominant_peaks = (power > power_threshold).sum()
 
         return acf_peaks >= 1 and dominant_peaks >= 1
-
-    def get_lags(self, series) -> pd.DataFrame:
-        lagged_df = series.to_frame()
-        lagged_df.columns = ['X_t']
-
-        lags = self.n_lags_func(self.var)
-        for lag in range(1, lags + 1):
-            lagged_df[f"X_t{lag}"] = lagged_df['X_t'].shift(lag)
-
-        lagged_df = lagged_df.dropna(how='any')
-        return lagged_df
 
     def rf_distil(self,
                   grid_search: bool = False,
                   gs_params: Optional[dict[str, list[Any]]] = None):
 
-        lagged_df = self.get_lags(self.filtered)
+        lagged_df = du.get_lags(self.filtered)
 
         rf = RandomForestRegressor(n_estimators=300, random_state=0)
         X = lagged_df.drop('X_t', axis=1)
@@ -125,17 +205,22 @@ class BaseVarModel:
         lof_filtered = self.filtered
         is_seasonal = self.is_seasonal(self.var)
 
-        unary = self.UNARY_DEFAULT | self.EXTRA_UNARY_DEFAULT
-        constraints = self.CONSTRAINTS_DEFAULT
-
         if is_seasonal:
+            unary = UNARY_DEFAULT | EXTRA_UNARY_DEFAULT | EXTRA_UNARY_SEASONAL
+            constraints = CONSTRAINTS_DEFAULT | CONSTRAINTS_SEASONAL
+
+            cfg = replace(DEFAULT_SR_CONFIG_BASE,
+                          constraints=constraints,
+                          unary_operators=[item['julia'] for item in unary.values()],
+                          extra_sympy_mappings={item[0]: item[1]['sympy'] for item in unary.items()}
+                          )
             print(f"Cyclical trig functions are enabled for {self.var.name} due to detected seasonality.")
-            unary = unary | self.EXTRA_UNARY_SEASONAL
-            constraints = constraints | self.CONSTRAINTS_SEASONAL
+
         else:
+            cfg = DEFAULT_SR_CONFIG_BASE
             print(f"No seasonality detected in {self.var.name}. Cyclical trig functions are disabled.")
 
-        lagged_df = self.get_lags(lof_filtered)
+        lagged_df = du.get_lags(lof_filtered)
         X_t = self.rf_distil(grid_search=kwargs.get('grid_search', False),
                              gs_params=kwargs.get('gs_params', {})).to_frame()
 
@@ -147,27 +232,7 @@ class BaseVarModel:
             X_train, X_val = X_lag.iloc[train_idx], X_lag.iloc[test_idx]
             y_train, y_val = X_t.iloc[train_idx], X_t.iloc[test_idx]
 
-            curr_sr = PySRRegressor(
-                model_selection=kwargs.get('model_selection', 'accuracy'),  # type:ignore
-
-                niterations=kwargs.get('niterations', 300),
-                maxsize=kwargs.get('maxsize', 32),
-
-                binary_operators=self.BINARY_DEFAULT,
-                unary_operators=[item['julia'] for item in unary.values()],
-                extra_sympy_mappings={x[0]: x[1]['sympy'] for x in unary.items()},
-
-                constraints=constraints | kwargs.get('constraints', {}),
-                elementwise_loss=kwargs.get('elementwise_loss', 'L2DistLoss()'),
-                progress=kwargs.get('progress', False),
-                temp_equation_file=kwargs.get('temp_equation_file', True),
-
-                deterministic=kwargs.get('deterministic', True),
-                random_state=kwargs.get('random_state', 0),
-                parallelism=kwargs.get('parallelism', 'serial'),  # type:ignore
-                batching=kwargs.get('batching', False),
-                verbosity=kwargs.get('verbosity', 0),
-            )
+            curr_sr = sr_generator(cfg)
 
             curr_sr.fit(X_train, y_train)
             fold_mse = mean_squared_error(curr_sr.predict(X_val), y_val)
@@ -200,88 +265,3 @@ class BaseVarModel:
     def DEFAULT_LAG_COUNT(self) -> Callable[[pd.Series], int]:
         # Cube root of data length
         return lambda x: int(np.ceil(len(x)**(1/3)))
-
-    @property
-    def EXTRA_UNARY_DEFAULT(self):
-        return {
-            'inv': {
-                'julia': 'inv(x)=1/x',
-                'sympy': lambda x: 1/x
-            },
-
-            'atan': {
-                'julia': 'atan',
-                'sympy': lambda x: sp.atan(x)
-            }
-        }
-
-    @property
-    def EXTRA_UNARY_SEASONAL(self):
-        return {
-            'sin': {
-                'julia': 'sin',
-                'sympy': lambda x: sp.sin(x)
-            },
-
-            'sin2': {
-                'julia': 'sin2(x)=sin(x)^2',
-                'sympy': lambda x: sp.sin(x)**2
-            },
-
-            'tan': {
-                'julia': 'tan',
-                'sympy': lambda x: sp.tan(x)
-            },
-
-            'tan2': {
-                'julia': 'tan2(x)=tan(x)^2',
-                'sympy': lambda x: sp.tan(x)**2
-            }
-        }
-
-    @property
-    def UNARY_DEFAULT(self):
-        return {
-            'safe_log': {
-                'julia': 'safe_log(x) = sign(x) * log(abs(x))',
-                'sympy': lambda x: sp.sign(x) * sp.log(abs(x))
-            },
-            'safe_sqrt': {
-                'julia': 'safe_sqrt(x) = sign(x) * sqrt(abs(x))',
-                'sympy': lambda x: sp.sign(x) * sp.sqrt(abs(x))
-            },
-
-            'soft_guard_root': {
-                'julia': 'soft_guard_root(x::T) where {T<:Real} = sqrt(sqrt(x^2 + T(1e-6)))',
-                'sympy': lambda x: sp.sqrt(sp.sqrt(x**2 + 1e-6))
-            },
-
-            'exp': {
-                'julia': 'exp',
-                'sympy': lambda x: sp.exp(x)
-            }
-        }
-
-    @property
-    def BINARY_DEFAULT(self):
-        return ['+', '-', '/', '*', '^']
-
-    @property
-    def CONSTRAINTS_DEFAULT(self):
-        return {
-            '^': (-1, 3),
-            'atan': 3,
-            'safe_log': 3,
-            'safe_sqrt': 2,
-            'soft_guard_root': 2,
-            'inv': -1
-        }
-
-    @property
-    def CONSTRAINTS_SEASONAL(self):
-        return {
-            'sin': 2,
-            'sin2': 2,
-            'tan': 2,
-            'tan2': 2
-        }
