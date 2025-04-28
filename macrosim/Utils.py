@@ -4,7 +4,7 @@ from pysr import PySRRegressor, AbstractLoggerSpec, AbstractExpressionSpec
 
 from sklearn.neighbors import LocalOutlierFactor
 
-from typing import Literal, Callable, Optional
+from typing import Literal, Callable, Optional, get_type_hints, TypedDict
 from dataclasses import dataclass, asdict
 
 
@@ -614,11 +614,107 @@ class SrConfig:
     select_k_features: int | None = None
 
 
+class SrKwargs(TypedDict, total=False):
+
+    model_selection: Literal['best', 'accuracy', 'score']
+    binary_operators: list[str] | None
+    unary_operators: list[str] | None
+    expression_spec: AbstractExpressionSpec | None
+    niterations: int
+    populations: int
+    population_size: int
+    max_evals: int | None
+    maxsize: int
+    maxdepth: int | None
+    warmup_maxsize_by: float | None
+    timeout_in_seconds: float | None
+    constraints: dict[str, int | tuple[int, int]] | None
+    nested_constraints: dict[str, dict[str, int]] | None
+    elementwise_loss: str | None
+    loss_function: str | None
+    loss_function_expression: str | None
+    complexity_of_operators: dict[str, int | float] | None
+    complexity_of_constants: int | float | None
+    complexity_of_variables: int | float | list[int | float] | None
+    complexity_mapping: str | None
+    parsimony: float
+    dimensional_constraint_penalty: float | None
+    dimensionless_constants_only: bool
+    use_frequency: bool
+    use_frequency_in_tournament: bool
+    adaptive_parsimony_scaling: float
+    alpha: float
+    annealing: bool
+    early_stop_condition: float | str | None
+    ncycles_per_iteration: int
+    fraction_replaced: float
+    fraction_replaced_hof: float
+    weight_add_node: float
+    weight_insert_node: float
+    weight_delete_node: float
+    weight_do_nothing: float
+    weight_mutate_constant: float
+    weight_mutate_operator: float
+    weight_swap_operands: float
+    weight_rotate_tree: float
+    weight_randomize: float
+    weight_simplify: float
+    weight_optimize: float
+    crossover_probability: float
+    skip_mutation_failures: bool
+    migration: bool
+    hof_migration: bool
+    topn: int
+    should_simplify: bool
+    should_optimize_constants: bool
+    optimizer_algorithm: Literal['BFGS', 'NelderMead']
+    optimizer_nrestarts: int
+    optimizer_f_calls_limit: int | None
+    optimize_probability: float
+    optimizer_iterations: int
+    perturbation_factor: float
+    probability_negate_constant: float
+    tournament_selection_n: int
+    tournament_selection_p: float
+    parallelism: Optional[Literal['serial', 'multithreading', 'multiprocessing']]
+    procs: int | None
+    cluster_manager: Optional[Literal['slurm', 'pbs', 'lsf', 'sge', 'qrsh', 'scyld', 'htc']]
+    heap_size_hint_in_bytes: int | None
+    batching: bool
+    batch_size: int
+    fast_cycle: bool
+    turbo: bool
+    bumper: bool
+    precision: Literal[16, 32, 64]
+    autodiff_backend: Optional[Literal['Zygote']]
+    random_state: int | np.random.mtrand.RandomState | None
+    deterministic: bool
+    warm_start: bool
+    verbosity: int
+    update_verbosity: int | None
+    print_precision: int
+    progress: bool
+    logger_spec: AbstractLoggerSpec | None
+    input_stream: str
+    run_id: str | None
+    output_directory: str | None
+    temp_equation_file: bool
+    tempdir: str | None
+    delete_tempfiles: bool
+    update: bool
+    output_jax_format: bool
+    output_torch_format: bool
+    extra_sympy_mappings: dict[str, Callable] | None
+    extra_torch_mappings: dict[Callable, Callable] | None
+    extra_jax_mappings: dict[Callable, str] | None
+    denoise: bool
+    select_k_features: int | None
+
+
+
 def sr_generator(config: SrConfig) -> PySRRegressor:
     """
     Generates a PySRRegressor object with the specified keyword arguments.
     :return: PySRRegressor object
     """
     return PySRRegressor(**asdict(config))
-
-

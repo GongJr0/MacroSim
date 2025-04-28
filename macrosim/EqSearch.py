@@ -1,9 +1,9 @@
-from typing import Optional, Any
+from typing import Optional, Any, Unpack
 
 from pysr import PySRRegressor
 import sympy as sp
 
-from macrosim.Utils import SrConfig, sr_generator
+from macrosim.Utils import SrConfig, SrKwargs, sr_generator
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
@@ -50,7 +50,7 @@ DEFAULT_CONSTRAINTS = {
         'inv': -1
 }
 
-DEFAULT_SR_CONFIG_EQ_SEARCH = SrConfig(
+DEFAULT_SR_COFING_EQ_SEARCH = SrConfig(
                     model_selection='accuracy',
                     maxsize=32,
                     niterations=300,
@@ -155,7 +155,7 @@ class EqSearch:
                custom_loss: Optional[str] = None,
                constraints: Optional[dict[str, tuple[int, int]]] = None,
                cv: int = 1,
-               **kwargs) -> None:
+               **kwargs: Unpack[SrKwargs]) -> None:
 
         assert self.distilled.shape == self.y.shape, "Run self.distil_split() before symbolizing."
         
@@ -168,11 +168,12 @@ class EqSearch:
         unary = DEFAULT_UNARY | extra_unary_ops
         constraints = DEFAULT_CONSTRAINTS | constraints
 
-        cfg = replace(DEFAULT_SR_CONFIG_EQ_SEARCH,
+        cfg = replace(DEFAULT_SR_COFING_EQ_SEARCH,
                       unary_operators=[item['julia'] for item in unary.values()],
                       extra_sympy_mappings={item[0]: item[1]['sympy'] for item in unary.items()},
                       constraints=constraints,
-                      elementwise_loss=custom_loss or DEFAULT_SR_CONFIG_EQ_SEARCH.elementwise_loss
+                      elementwise_loss=custom_loss or DEFAULT_SR_COFING_EQ_SEARCH.elementwise_loss,
+                      **(kwargs or {})
                       )
 
         if cv > 1:
