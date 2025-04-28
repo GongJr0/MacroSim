@@ -2,7 +2,7 @@ from sklearn.ensemble import RandomForestRegressor
 
 from macrosim.BaseVarSelector import BaseVarSelector
 from macrosim.BaseVarModel import BaseVarModel
-from macrosim.Utils import SrConfig, sr_generator
+from macrosim.Utils import SrConfig, SrKwargs, sr_generator
 from macrosim.Utils import DataUtils as du
 
 from pysr import PySRRegressor
@@ -17,6 +17,7 @@ import pickle
 from joblib import Parallel, delayed
 
 from dataclasses import replace
+from typing import Unpack
 
 DEFAULT_SR_CONFIG_NON_BASE = SrConfig(
     # Search method config
@@ -153,7 +154,7 @@ class GrowthDetector:
             self.base_estimators[var] = estimator
             self.estimators[var] = estimator
 
-    def _get_non_base_var_growth(self, **kwargs) -> None:
+    def _get_non_base_var_growth(self, **kwargs: Unpack[SrKwargs]) -> None:
         base = self.base
 
         def fit_non_base_var(var, df):
@@ -195,10 +196,10 @@ class GrowthDetector:
             estimator = GrowthEstimator(sr, is_base=False)
             self.estimators[var] = estimator
 
-    def base_estimator_kwargs(self, **kwargs) -> None:
+    def base_estimator_kwargs(self, **kwargs: Unpack[SrKwargs]) -> None:
         self._base_kwargs = kwargs
 
-    def non_base_estimator_kwargs(self, **kwargs) -> None:
+    def non_base_estimator_kwargs(self, **kwargs: Unpack[SrKwargs]) -> None:
         self._non_base_kwargs = kwargs
 
     def compose_estimators(self, cv=5) -> dict[str, GrowthEstimator]:

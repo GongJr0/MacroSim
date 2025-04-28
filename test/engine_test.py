@@ -26,8 +26,8 @@ df = fred.get_series(
 gd = GrowthDetector(
     features=df.drop('RGDP', axis=1)
 )
-gd.base_estimator_kwargs(verbosity=0, batching=False)
-gd.non_base_estimator_kwargs(verbosity=0, batching=False)
+gd.base_estimator_kwargs(verbosity=0, batching=False, elementwise_loss='QuantileLoss()')
+gd.non_base_estimator_kwargs(verbosity=0, batching=False, elementwise_loss='QuantileLoss()')
 
 growth = gd.compose_estimators(cv=2)
 
@@ -36,7 +36,7 @@ eqsr = EqSearch(
     y=df['RGDP']
 )
 eqsr.distil_split()
-eqsr.search(maxsize=16, niterations=250)
+eqsr.search(maxsize=16, niterations=250, verbosity=1)
 
 init_params = {
     var: (df[var].head(gd.get_lag_count), growth[var]) for var in df.drop('RGDP', axis=1).columns
