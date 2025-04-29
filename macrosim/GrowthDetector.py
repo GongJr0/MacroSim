@@ -82,7 +82,7 @@ class GrowthEstimator:
             setattr(self.model, key, value)
 
     def __repr__(self):
-        return f"WrappedRegressor(is_base={self.is_base}, model={repr(self.model)})"
+        return f"GrowthEstimator(is_base={self.is_base}, model={repr(self.model)})"
 
 
 class GrowthDetector:
