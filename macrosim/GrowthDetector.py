@@ -82,7 +82,7 @@ class GrowthEstimator:
             setattr(self.model, key, value)
 
     def __repr__(self):
-        return f"WrappedRegressor(is_base={self.is_base}, model={repr(self.model)})"
+        return f"GrowthEstimator(is_base={self.is_base}, model={repr(self.model)})"
 
 
 class GrowthDetector:
@@ -209,11 +209,8 @@ class GrowthDetector:
 
         return self.estimators
 
-    # WIP
-    def serialize_estimators(self, file: str = "growth_estimators.pkl") -> None:
-        with open(file, 'wb') as f:
-            dump = (self, self.estimators)
-            pickle.dump(dump, f)
+    def serialize_estimators(self, path: str) -> None:
+        raise NotImplementedError('Serialization support will be implemented when PySR regressors support pickle.')
 
     @staticmethod
     def _n_lags(series):

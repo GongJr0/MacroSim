@@ -67,6 +67,10 @@ class SimEngine:
     def _format_lags(self):
         n_lags = self.n_lags
         data = self.param_space_df.tail(n_lags)
+        if data.isna().sum().sum() > 0:
+            print('NaN encountered in lagged features. Fill value used: 0')
+            data = data.fillna(0)
+
         new_index = data.columns
         new_columns = [f"X_t{x}" for x in range(1, n_lags + 1)]
         data = data.T
@@ -88,7 +92,7 @@ class SimEngine:
         }
         unordered_params = {**base_params, **non_base_params}
 
-        eq_params = {param: unordered_params[param] for param in self.param_names}
+        eq_params = {param: unordered_params[param] if unordered_params[param] is not None else 0 for param in self.param_names}
 
         model_input = np.array([var for var in eq_params.values()]).reshape(1, -1)
         out = self.sr.predict(model_input)
