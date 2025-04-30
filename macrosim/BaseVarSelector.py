@@ -9,6 +9,9 @@ from statsmodels.tools.sm_exceptions import MissingDataError
 from statsmodels.tsa.ar_model import AutoReg
 from statsmodels.tsa.stattools import adfuller
 
+import contextlib
+import io
+
 from typing import Any
 
 
@@ -43,9 +46,9 @@ class BaseVarSelector:
             for j in range(n):
                 if i == j:
                     continue
-
-                test_res = grangercausalitytests(self.df[[var_names[i], var_names[j]]],
-                                                 maxlag=np.floor(np.sqrt(len(self.df))))
+                with contextlib.redirect_stdout(io.StringIO()):
+                    test_res = grangercausalitytests(self.df[[var_names[j], var_names[i]]],
+                                                     maxlag=np.floor(np.sqrt(len(self.df))))
 
                 p_val = [test_res[lag][0]['ssr_chi2test'][1] for lag in test_res]
                 G.iloc[i, j] = min(p_val)
@@ -125,11 +128,21 @@ class BaseVarSelector:
         self.autoregressive_compatibility()
 
         scores = self.score_dict
-        agg_scores = {k: (2/3)*scores[k]['Granger'] + (1/3)*scores[k]['Multivar_Granger'] + scores[k]['ADF'] for k in scores.keys()}
+
+        def rank_normalize(rank):
+            return (rank - 1) / (len(scores) - 1)
+
+        agg_scores = {k: (2/3)*rank_normalize(scores[k]['Granger']) +  # 2/3 weighted (normalized)
+                         (1/3)*rank_normalize(scores[k]['Multivar_Granger']) +  # 1/3 weighted (normalized)
+                         rank_normalize(scores[k]['ADF']) for k in scores.keys()}  # Not weighted (normalized)
+
         sorted_scores = sorted(agg_scores.items(), key=lambda x: x[1])
 
         n_base = int(np.ceil(np.sqrt(len(sorted_scores))))
         base = [score[0] for score in sorted_scores][:n_base]
+        print('Base Candidate Scores:')
+        print('\n'.join([f"- {k}: {v:.2f}" for k, v in sorted_scores]))
+
         print('Selected Base variables:')
         print('\n'.join(["- " + x for x in base]))
         return self.df[base]
