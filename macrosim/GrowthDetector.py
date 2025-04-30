@@ -208,7 +208,7 @@ class GrowthDetector:
         self._get_non_base_var_growth(**self._non_base_kwargs)
 
         return self.estimators
-    
+
     def serialize_estimators(self, path: str) -> None:
         raise NotImplementedError('Serialization support will be implemented when PySR regressors support pickle.')
 
