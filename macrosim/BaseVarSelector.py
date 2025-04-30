@@ -45,7 +45,8 @@ class BaseVarSelector:
                     continue
 
                 test_res = grangercausalitytests(self.df[[var_names[i], var_names[j]]],
-                                                 maxlag=np.floor(np.sqrt(len(self.df))))
+                                                 maxlag=np.floor(np.sqrt(len(self.df))),
+                                                 verbose=False)
 
                 p_val = [test_res[lag][0]['ssr_chi2test'][1] for lag in test_res]
                 G.iloc[i, j] = min(p_val)
@@ -130,6 +131,9 @@ class BaseVarSelector:
 
         n_base = int(np.ceil(np.sqrt(len(sorted_scores))))
         base = [score[0] for score in sorted_scores][:n_base]
+        print('Base Candidate Scores:')
+        print('\n'.join([f"- {k}: {v}" for k, v in sorted_scores]))
+
         print('Selected Base variables:')
         print('\n'.join(["- " + x for x in base]))
         return self.df[base]
