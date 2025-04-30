@@ -17,17 +17,17 @@ start = dt.datetime.fromisoformat('2002-01-01')
 end = dt.datetime.fromisoformat('2024-12-31')
 
 df = fred.get_series(
-    series_ids=['PCECC96', 'GPDIC1', 'EXPGSC1', 'IMPGSC1', 'GDPC1'],
-    series_alias=['CONSUMPTION', 'DOMINV', 'REXP', 'RIMP', 'RGDP'],
-    date_range=(start, end),
-    reindex_freq='QS'
+    series_ids=['CIVPART', 'IMPGSC1', 'GPDI', 'GDPC1'],
+    series_alias=[None, 'RIMP', 'DOMINV', 'RGDP'],
+    reindex_freq='QS',
+    date_range=(start, end)
 )
 
 gd = GrowthDetector(
     features=df.drop('RGDP', axis=1)
 )
-gd.base_estimator_kwargs(verbosity=0, batching=False, elementwise_loss='QuantileLoss()')
-gd.non_base_estimator_kwargs(verbosity=0, batching=False, elementwise_loss='QuantileLoss()')
+gd.base_estimator_kwargs(verbosity=0, batching=False)
+gd.non_base_estimator_kwargs(verbosity=0, batching=False)
 
 growth = gd.compose_estimators(cv=2)
 
