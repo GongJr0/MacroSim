@@ -29,7 +29,7 @@ as a proof of concept in early stages of development.
 
 ## Example Usage
 
-Production function modelling (I believe) can be one of the most common use cases for MacroSim, and it will be the
+Production function modelling can be one of the most common use cases for MacroSim, and it will be the
 example of choice here.  Let's assume we're looking into modelling real GDP as a function of:
 
 - Labor Participation Rate
