@@ -206,7 +206,7 @@ note is that the simulations consistently underestimated the output, with the ex
 the predictions did not display cyclical errors, but a clearly visible pattern appeared around 30 steps into the 50 step
 simulation.
 
-The coefficient of determination ($R^2$) for this particular example was $\approx 0.722$ which is definitely not upto 
+The coefficient of determination ($R^2$) for this particular example was $\approx 0.722$ which is definitely not up to 
 standard, nor hopeless. With further development the accuracy of simulations (especially for shorter periods) will 
 definitely increse.
 

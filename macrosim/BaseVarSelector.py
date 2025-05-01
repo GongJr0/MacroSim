@@ -24,8 +24,8 @@ class BaseVarSelector:
         var_names = self.df.columns.tolist()
         alpha = 0.05
         for col in var_names:
-            p_val = adfuller(self.df[col])[1]  # type:ignore   # adfuller return is mistyped
-            compatible = p_val < alpha
+            p_val = adfuller(self.df[col])[1]  # type:ignore # adfuller return is mistyped
+            compatible = p_val <= alpha
             self.score_dict[col]['ADF'] = 0 if compatible else 1
 
     def granger_score(self, G_matrix):
@@ -134,7 +134,7 @@ class BaseVarSelector:
 
         agg_scores = {k: (2/3)*rank_normalize(scores[k]['Granger']) +  # 2/3 weighted (normalized)
                          (1/3)*rank_normalize(scores[k]['Multivar_Granger']) +  # 1/3 weighted (normalized)
-                         rank_normalize(scores[k]['ADF']) for k in scores.keys()}  # Not weighted (normalized)
+                         scores[k]['ADF'] for k in scores.keys()}  # Not weighted (binary)
 
         sorted_scores = sorted(agg_scores.items(), key=lambda x: x[1])
 

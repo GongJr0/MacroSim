@@ -104,6 +104,10 @@ class EqSearch:
             'exp': {
                 'julia': 'exp',
                 'sympy': lambda x: sp.exp(x)
+            },
+            'atan': {
+                'julia': 'atan',
+                'sympy': lambda x: sp.atan(x)
             }
         }
 
@@ -153,7 +157,7 @@ class EqSearch:
     def search(self,
                extra_unary_ops: Optional[dict[str, dict[str, Any]]] = None,
                custom_loss: Optional[str] = None,
-               constraints: Optional[dict[str, tuple[int, int]]] = None,
+               constraints: Optional[dict[str, tuple[int, int] | int]] = None,
                cv: int = 1,
                **kwargs: Unpack[SrKwargs]) -> None:
 
