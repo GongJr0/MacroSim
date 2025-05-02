@@ -107,7 +107,7 @@ class GrowthDetector:
             k: None for k in self.vars
         }
 
-    def _get_base_var_growth(self, cv=5, **kwargs) -> None:
+    def _get_base_var_growth(self, loss_threshold=1e10, cv=5, **kwargs) -> None:
         base_df = self.base
         var_ls = self.base_vars
 
@@ -116,7 +116,7 @@ class GrowthDetector:
             bvm = BaseVarModel(series)
 
             bvm.symbolic_model(cv=cv, **kwargs)
-            fitted_estimator = bvm.model_select()
+            fitted_estimator = bvm.model_select(loss_threshold)
 
             sr_params = None
             if isinstance(fitted_estimator, PySRRegressor):
@@ -156,9 +156,9 @@ class GrowthDetector:
 
     def _get_non_base_var_growth(self, **kwargs: Unpack[SrKwargs]) -> None:
         base = self.base
+        cfg = replace(DEFAULT_SR_CONFIG_NON_BASE, **(kwargs or {}))
 
         def fit_non_base_var(var, df):
-            cfg = replace(DEFAULT_SR_CONFIG_NON_BASE, **(kwargs or {}))
             sr = sr_generator(config=cfg)
 
             filtered = du.lof_filter(df[var])
@@ -179,12 +179,8 @@ class GrowthDetector:
         )
 
         for var, out in results:
-            feature_names = [*[f"X_t{n}" for n in range(1, self._n_lags(self.df[var]) + 1)], *self.base_vars]
+            dummy_frame = du.get_dummy_frame(self.base_vars, self._n_lags(self.df[var]))
             label_name = 'X_t'
-            dummy_frame = pd.DataFrame(
-                np.zeros((1, len(feature_names) + 1)),  # 1 row, N+1 columns
-                columns=[label_name, *feature_names]
-            )
 
             sr = sr_generator(
                 SrConfig(maxsize=7, niterations=1, verbosity=0)
@@ -202,9 +198,10 @@ class GrowthDetector:
     def non_base_estimator_kwargs(self, **kwargs: Unpack[SrKwargs]) -> None:
         self._non_base_kwargs = kwargs
 
-    def compose_estimators(self, cv=5) -> dict[str, GrowthEstimator]:
-
-        self._get_base_var_growth(cv, **self._base_kwargs)
+    def compose_estimators(self, cv=5, bv_loss_threshold=None) -> dict[str, GrowthEstimator]:
+        bv_loss_threshold = 1e10 if not bv_loss_threshold else bv_loss_threshold
+        
+        self._get_base_var_growth(bv_loss_threshold, cv, **self._base_kwargs)
         self._get_non_base_var_growth(**self._non_base_kwargs)
 
         return self.estimators
