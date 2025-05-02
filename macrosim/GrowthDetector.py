@@ -156,9 +156,9 @@ class GrowthDetector:
 
     def _get_non_base_var_growth(self, **kwargs: Unpack[SrKwargs]) -> None:
         base = self.base
+        cfg = replace(DEFAULT_SR_CONFIG_NON_BASE, **(kwargs or {}))
 
         def fit_non_base_var(var, df):
-            cfg = replace(DEFAULT_SR_CONFIG_NON_BASE, **(kwargs or {}))
             sr = sr_generator(config=cfg)
 
             filtered = du.lof_filter(df[var])
@@ -179,12 +179,8 @@ class GrowthDetector:
         )
 
         for var, out in results:
-            feature_names = [*[f"X_t{n}" for n in range(1, self._n_lags(self.df[var]) + 1)], *self.base_vars]
+            dummy_frame = du.get_dummy_frame(self.base_vars, self._n_lags(self.df[var]))
             label_name = 'X_t'
-            dummy_frame = pd.DataFrame(
-                np.zeros((1, len(feature_names) + 1)),  # 1 row, N+1 columns
-                columns=[label_name, *feature_names]
-            )
 
             sr = sr_generator(
                 SrConfig(maxsize=7, niterations=1, verbosity=0)
