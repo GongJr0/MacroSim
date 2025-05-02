@@ -75,6 +75,18 @@ class DataUtils:
         lagged_df = lagged_df.dropna(how='any')
         return lagged_df
 
+    @staticmethod
+    def get_dummy_frame(base_vars, n_lags):
+        base_vars = [] if not base_vars else base_vars
+
+        feature_names = [*[f"X_t{n}" for n in range(1, n_lags + 1)], *base_vars]
+        label_name = 'X_t'
+        dummy_frame = pd.DataFrame(
+            np.zeros((1, len(feature_names) + 1)),  # 1 row, N+1 columns
+            columns=[label_name, *feature_names]
+        )
+        return dummy_frame
+
 
 @dataclass(frozen=True)
 class SrConfig:
