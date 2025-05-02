@@ -25,13 +25,11 @@ df = fred.get_series(
     date_range=(start, end)
 )
 
-print(df.isna().sum())
-
 gd = GrowthDetector(
     features=df.drop('RGDP', axis=1)
 )
-gd.base_estimator_kwargs(verbosity=0, niterations=250)
-gd.non_base_estimator_kwargs(verbosity=0, niterations=250)
+gd.base_estimator_kwargs(verbosity=0, niterations=100, maxsize=8)
+gd.non_base_estimator_kwargs(verbosity=0, niterations=100, maxsize=8)
 
 growth = gd.compose_estimators(cv=2)
 
