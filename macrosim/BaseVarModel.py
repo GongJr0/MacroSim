@@ -245,11 +245,11 @@ class BaseVarModel:
 
         return sr.get_best()['sympy_format']
 
-    def model_select(self, loss_diff_threshold=0.05) -> PySRRegressor | RandomForestRegressor:
+    def model_select(self, loss_diff_threshold=1e10) -> PySRRegressor | RandomForestRegressor:
         assert (self.sr_loss is not None) and (self.rf_loss is not None), ("Run symbolic_model to store the best SR "
                                                                            "and RF instances before model selection.")
 
-        loss_diff = (self.sr_loss / self.rf_loss) - 1
+        loss_diff = (self.sr_loss/self.rf_loss) - 1
         if loss_diff >= loss_diff_threshold:
             selected = self.rf
             print(f"SR Model introduces {loss_diff:.2%} higher MSE compared to RF predictions. "

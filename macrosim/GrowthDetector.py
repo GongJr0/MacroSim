@@ -107,7 +107,7 @@ class GrowthDetector:
             k: None for k in self.vars
         }
 
-    def _get_base_var_growth(self, cv=5, **kwargs) -> None:
+    def _get_base_var_growth(self, loss_threshold=1e10, cv=5, **kwargs) -> None:
         base_df = self.base
         var_ls = self.base_vars
 
@@ -116,7 +116,7 @@ class GrowthDetector:
             bvm = BaseVarModel(series)
 
             bvm.symbolic_model(cv=cv, **kwargs)
-            fitted_estimator = bvm.model_select()
+            fitted_estimator = bvm.model_select(loss_threshold)
 
             sr_params = None
             if isinstance(fitted_estimator, PySRRegressor):
@@ -198,9 +198,10 @@ class GrowthDetector:
     def non_base_estimator_kwargs(self, **kwargs: Unpack[SrKwargs]) -> None:
         self._non_base_kwargs = kwargs
 
-    def compose_estimators(self, cv=5) -> dict[str, GrowthEstimator]:
-
-        self._get_base_var_growth(cv, **self._base_kwargs)
+    def compose_estimators(self, cv=5, bv_loss_threshold=None) -> dict[str, GrowthEstimator]:
+        bv_loss_threshold = 1e10 if not bv_loss_threshold else bv_loss_threshold
+        
+        self._get_base_var_growth(bv_loss_threshold, cv, **self._base_kwargs)
         self._get_non_base_var_growth(**self._non_base_kwargs)
 
         return self.estimators
