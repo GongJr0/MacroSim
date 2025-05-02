@@ -156,9 +156,9 @@ class GrowthDetector:
 
     def _get_non_base_var_growth(self, **kwargs: Unpack[SrKwargs]) -> None:
         base = self.base
+        cfg = replace(DEFAULT_SR_CONFIG_NON_BASE, **(kwargs or {}))
 
         def fit_non_base_var(var, df):
-            cfg = replace(DEFAULT_SR_CONFIG_NON_BASE, **(kwargs or {}))
             sr = sr_generator(config=cfg)
 
             filtered = du.lof_filter(df[var])
