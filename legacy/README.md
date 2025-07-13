@@ -41,7 +41,7 @@ example of choice here.  Let's assume we're looking into modelling real GDP as a
 The first step would be to retrieve data for the above-mentioned metrics from FRED using `macrosim.SeriesAccessor`.
 
 ```python
-from macrosim.SeriesAccessor import SeriesAccessor
+from legacy.macrosim.SeriesAccessor import SeriesAccessor
 import datetime as dt
 
 fred = SeriesAccessor(
@@ -86,7 +86,7 @@ Having our dataset, we can conduct a symbolic search to derive the most accurate
 constraints that we define.
 
 ```python
-from macrosim.EqSearch import EqSearch
+from legacy.macrosim.EqSearch import EqSearch
 
 eqsr = EqSearch(
     X=df.drop('RGDP', axis=1),
@@ -142,7 +142,7 @@ B --> C
 variables are available through separate methods to pass the kwargs.
 
 ```python
-from macrosim.GrowthDetector import GrowthDetector
+from legacy.macrosim import GrowthDetector
 
 gd = GrowthDetector(
     features=df.drop('RGDP', axis=1)
@@ -167,7 +167,7 @@ Having given the above information, simulations of any desired length is theoret
 due to error accumulation and drift)
 
 ```python
-from macrosim.SimEngine import SimEngine
+from legacy.macrosim import SimEngine
 
 init_params = {
     var: (df[var].head(gd.get_lag_count), growth[var]) for var in df.drop('RGDP', axis=1).columns
@@ -198,7 +198,7 @@ By plotting the simulated data against the real observations, we can check the p
 of growth functions (for now) accurate results are not expected. Plotting the simulation confirms this:
 
 <p align="center">
-  <img src="./assets/img.png" alt="Simulation Results"></img>
+  <img src="assets/img.png" alt="Simulation Results"></img>
 </p>
 
 We can observe that the simulation results were relatively linear and flatter than the actual values. Another important 

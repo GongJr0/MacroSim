@@ -1,9 +1,9 @@
 from sklearn.ensemble import RandomForestRegressor
 
-from macrosim.BaseVarSelector import BaseVarSelector
-from macrosim.BaseVarModel import BaseVarModel
-from macrosim.Utils import SrConfig, SrKwargs, sr_generator
-from macrosim.Utils import DataUtils as du
+from legacy.macrosim.BaseVarSelector import BaseVarSelector
+from legacy.macrosim.BaseVarModel import BaseVarModel
+from legacy.macrosim.Utils import SrConfig, SrKwargs, sr_generator
+from legacy.macrosim.Utils import DataUtils as du
 
 from pysr import PySRRegressor
 from sklearn.neighbors import LocalOutlierFactor

@@ -46,9 +46,6 @@ class SeriesAccessor:
             "A": 17, "BA": 18, "AS": 19, "BAS": 20
         }
 
-        if series_alias is None:
-            series_alias = len(series_ids) * [None]
-
         for series_id, alias in zip(series_ids, series_alias):
             series = self.fred.get_series(series_id, observation_start=date_range[0], observation_end=date_range[1])
             series.index = pd.to_datetime(series.index)

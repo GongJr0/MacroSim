@@ -4,8 +4,8 @@ import numpy as np
 import sympy as sp
 import pandas as pd
 
-from macrosim.Utils import DataUtils as du
-from macrosim.Utils import SrConfig, sr_generator
+from legacy.macrosim.Utils import DataUtils as du
+from legacy.macrosim.Utils import SrConfig, sr_generator
 from dataclasses import replace
 
 from sklearn.ensemble import RandomForestRegressor

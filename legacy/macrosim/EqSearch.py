@@ -3,7 +3,7 @@ from typing import Optional, Any, Unpack
 from pysr import PySRRegressor
 import sympy as sp
 
-from macrosim.Utils import SrConfig, SrKwargs, sr_generator
+from legacy.macrosim.Utils import SrConfig, SrKwargs, sr_generator
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error

@@ -6,7 +6,7 @@ import numpy as np
 
 from pysr import PySRRegressor
 from sklearn.ensemble import RandomForestRegressor
-from macrosim.GrowthDetector import GrowthEstimator
+from legacy.macrosim.GrowthDetector import GrowthEstimator
 
 from typing import Callable, Union, Any, Type
 from collections.abc import Generator
