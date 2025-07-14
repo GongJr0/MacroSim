@@ -1,0 +1,10 @@
+name: Documentation Update
+description: Propose updates or additions to documentation
+labels: [v2.x, documentation]
+assignees:
+  - GongJr0
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Specify the documentation section and improvements needed.
