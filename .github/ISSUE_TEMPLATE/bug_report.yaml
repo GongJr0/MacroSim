@@ -1,0 +1,10 @@
+name: Bug Report
+description: Report a bug in the system
+labels: [v2.x, bug]
+assignees:
+  - GongJr0
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the bug and provide steps to reproduce it.

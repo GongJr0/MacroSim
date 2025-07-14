@@ -1,0 +1,10 @@
+name: Refactor
+description: Suggest a refactor or structural improvement
+labels: [v2.x, enhancement]
+assignees:
+  - GongJr0
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the part of the code that needs refactoring and why.

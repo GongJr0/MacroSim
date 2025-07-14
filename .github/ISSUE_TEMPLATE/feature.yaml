@@ -1,0 +1,10 @@
+name: Feature
+description: Suggest a new feature for the project
+labels: [v2.x, feature]
+assignees:
+  - GongJr0
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Outline the feature and its intended impact.
