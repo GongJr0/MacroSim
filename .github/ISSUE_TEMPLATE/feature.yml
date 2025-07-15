@@ -10,4 +10,4 @@ body:
         Outline the feature and its intended impact.
   - type: textarea
     attributes:
-      label: " "
+      label: "Fill here:"

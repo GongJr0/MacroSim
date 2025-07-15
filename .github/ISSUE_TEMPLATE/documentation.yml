@@ -10,4 +10,4 @@ body:
         Specify the documentation section and improvements needed.
   - type: textarea
     attributes:
-      label: " "
+      label: "Fill here:"
