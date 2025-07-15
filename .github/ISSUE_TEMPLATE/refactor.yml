@@ -8,3 +8,6 @@ body:
     attributes:
       value: |
         Describe the part of the code that needs refactoring and why.
+  - type: textarea
+    attributes:
+      label: "..."

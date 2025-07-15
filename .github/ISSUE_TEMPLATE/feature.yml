@@ -8,3 +8,6 @@ body:
     attributes:
       value: |
         Outline the feature and its intended impact.
+  - type: textarea
+    attributes:
+      label: "..."

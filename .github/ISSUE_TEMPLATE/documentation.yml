@@ -8,3 +8,6 @@ body:
     attributes:
       value: |
         Specify the documentation section and improvements needed.
+  - type: textarea
+    attributes:
+      label: "..."

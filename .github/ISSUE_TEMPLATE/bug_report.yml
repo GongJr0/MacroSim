@@ -9,5 +9,5 @@ body:
       value: |
         Please describe the bug and provide steps to reproduce it.
   - type: textarea
-  attributes:
-    label: "..."
+    attributes:
+      label: "..."
