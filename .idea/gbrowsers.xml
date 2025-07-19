@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="GBrowserService"><![CDATA[{
+  "defaultHomePage": "google.com",
+  "history": [
+    {
+      "name": "GBrowser - IntelliJ IDEs Plugin | Marketplace",
+      "url": "https://plugins.jetbrains.com/plugin/14458-gbrowser"
+    },
+    {
+      "name": "Google",
+      "url": "https://www.google.com/"
+    },
+    {
+      "name": "Google Search",
+      "url": "https://www.google.com/search?q=pysr+docs&sca_esv=19f478f15cf26273&source=hp&ei=FN57aPGMOJ3u0PEPk8vH-Qk&iflsig=AOw8s4IAAAAAaHvsJEi486U0Vq9GmDfgjtB8P0Cr_45p&ved=0ahUKEwjx5sqLwcmOAxUdNzQIHZPlMZ8Q4dUDCA8&uact=5&oq=pysr+docs&gs_lp=Egdnd3Mtd2l6IglweXNyIGRvY3MyBxAAGIAEGBMyBRAAGO8FMggQABiABBiiBDIFEAAY7wUyBRAAGO8FSOETUMsJWKgTcAF4AJABAJgBQ6AB4AOqAQE4uAEDyAEA-AEBmAIJoAL3A6gCCsICChAAGAMY6gIYjwHCAgsQABiABBixAxiDAcICDhAuGIAEGLEDGNEDGMcBwgIREC4YgAQYsQMY0QMYgwEYxwHCAgUQABiABMICCBAAGIAEGLEDwgIOEC4YgAQYxwEYjgUYrwHCAg4QABiABBixAxiDARiKBcICCBAuGIAEGLEDwgIREC4YgAQYsQMYxwEYjgUYrwHCAgsQLhiABBixAxiDAcICBBAAGB7CAgoQABgTGBYYChgewgIIEAAYExgWGB6YAwXxBRMyFP9431qlkgcBOaAHhDOyBwE4uAfxA8IHBTAuOC4xyAcT&sclient=gws-wiz"
+    },
+    {
+      "name": "pysr docs - Szukaj w Google",
+      "url": "https://www.google.com/search?q=pysr+docs&sca_esv=19f478f15cf26273&source=hp&ei=FN57aPGMOJ3u0PEPk8vH-Qk&iflsig=AOw8s4IAAAAAaHvsJEi486U0Vq9GmDfgjtB8P0Cr_45p&ved=0ahUKEwjx5sqLwcmOAxUdNzQIHZPlMZ8Q4dUDCA8&uact=5&oq=pysr+docs&gs_lp=Egdnd3Mtd2l6IglweXNyIGRvY3MyBxAAGIAEGBMyBRAAGO8FMggQABiABBiiBDIFEAAY7wUyBRAAGO8FSOETUMsJWKgTcAF4AJABAJgBQ6AB4AOqAQE4uAEDyAEA-AEBmAIJoAL3A6gCCsICChAAGAMY6gIYjwHCAgsQABiABBixAxiDAcICDhAuGIAEGLEDGNEDGMcBwgIREC4YgAQYsQMY0QMYgwEYxwHCAgUQABiABMICCBAAGIAEGLEDwgIOEC4YgAQYxwEYjgUYrwHCAg4QABiABBixAxiDARiKBcICCBAuGIAEGLEDwgIREC4YgAQYsQMYxwEYjgUYrwHCAgsQLhiABBixAxiDAcICBBAAGB7CAgoQABgTGBYYChgewgIIEAAYExgWGB6YAwXxBRMyFP9431qlkgcBOaAHhDOyBwE4uAfxA8IHBTAuOC4xyAcT&sclient=gws-wiz&sei=Hd57aIi3Nfy7wPAPwIO8qQY"
+    },
+    {
+      "name": "PySR",
+      "url": "https://astroautomata.com/PySR/"
+    },
+    {
+      "name": "API Reference - PySR",
+      "url": "https://astroautomata.com/PySR/api/"
+    }
+  ]
+}]]></component>
+</project>

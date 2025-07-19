@@ -12,5 +12,5 @@ repos:
             conda activate MacroSim &&
             pytest tests &&
             mypy macrosim/ &&
-            conda env export -n MacroSim | grep -v "^prefix: " > ./dev/conda_env.yaml &&
+            conda env export -n MacroSim --no-builds | grep -v "^prefix: " > ./dev/conda_env.yaml &&
             git diff --quiet ./dev/conda_env.yaml || git add ./dev/conda_env.yaml

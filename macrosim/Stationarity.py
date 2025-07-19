@@ -90,6 +90,12 @@ class StationarityAccessor:
         return self._results
 
     @property
+    def tests(self) -> dict[str, dict[LAG, PVAL]]:
+        if not self._results:
+            self._compute_results()
+        return self._results.tests
+
+    @property
     def is_stationary(self) -> dict[str, Literal[SeriesInfo.STATIONARY, SeriesInfo.NON_STATIONARY]]:
         if not self._results:
             self._compute_results()

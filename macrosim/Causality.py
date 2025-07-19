@@ -100,6 +100,13 @@ class CausalityAccessor:
         return self._results
 
     @property
+    def tests(self) -> dict[str, dict[str, list[tuple[LAG, PVAL]]]]:
+        if not self._results:
+            self._compute_results()
+
+        return self._results.tests
+
+    @property
     def is_causal(self) -> dict[str, Literal[SeriesInfo.CAUSAL, SeriesInfo.NON_CAUSAL]]:
         if not self._results:
             self._compute_results()
