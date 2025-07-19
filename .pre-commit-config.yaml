@@ -1,8 +1,8 @@
 repos:
   - repo: local
     hooks:
-      - id: run-pytest-via-conda-shell
-        name: Run Pytest via Conda Shell
+      - id: pre-commit-sequence
+        name: Pre Commit Sequence (Tests, Type Checks, Env Dependency Update)
         entry: bash -c
         language: system
         types: [python]
@@ -11,4 +11,6 @@ repos:
             source ~/miniconda3/etc/profile.d/conda.sh &&
             conda activate MacroSim &&
             pytest tests &&
-            mypy macrosim/
+            mypy macrosim/ &&
+            conda env export -n MacroSim | grep -v "^prefix: " > ./dev/conda_env.yaml &&
+            git diff --quiet ./dev/conda_env.yaml || git add ./dev/conda_env.yaml
