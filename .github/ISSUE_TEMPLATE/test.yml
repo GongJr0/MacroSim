@@ -1,0 +1,10 @@
+name: Test Suite Addition
+description: Add tests for modules or features
+labels: [v2.x, test]
+assignees:
+  - GongJr0
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please provide the modules/features requiring test files.
