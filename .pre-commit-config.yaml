@@ -10,4 +10,5 @@ repos:
           - >
             source ~/miniconda3/etc/profile.d/conda.sh &&
             conda activate MacroSim &&
-            pytest tests
+            pytest tests &&
+            mypy macrosim/

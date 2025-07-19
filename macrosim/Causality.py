@@ -1,10 +1,9 @@
-from statsmodels.tsa.stattools import grangercausalitytests as granger  # noqa
+from statsmodels.tsa.stattools import grangercausalitytests as granger  # type: ignore # noqa
 
 import warnings
-from enum import Enum
 from itertools import permutations
 from collections import Counter
-from typing import Union, Literal, NewType, cast, Optional
+from typing import Literal, cast
 from .StatsTypes import DATA, LAG, PVAL, TestStats, SeriesInfo
 from dataclasses import dataclass
 
@@ -46,7 +45,7 @@ class Causality:
     @staticmethod
     def perm_gct(df: pd.DataFrame, stat: Literal['F', 'chi2', 'lr'] = 'F', alpha=0.05) -> dict[str, dict[str, list[tuple[LAG, PVAL]]]]:
         pairs = permutations(df.columns, 2)
-        causality_matrix = {
+        causality_matrix: dict[str, dict[str, list[tuple[LAG, PVAL]]]] = {
             col: {} for col in df.columns
         }
 
@@ -88,7 +87,7 @@ class CausalityResult:
 class CausalityAccessor:
     def __init__(self, pandas_obj: DATA):
         self._obj = pandas_obj
-        self._results: Optional[CausalityResult] = None
+        self._results: CausalityResult = None  # type: ignore
 
     def _compute_results(self):
         self._results = CausalityResult(self._obj)

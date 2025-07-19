@@ -1,4 +1,4 @@
-from fredapi import Fred
+from fredapi import Fred  # type: ignore
 import pandas as pd
 import datetime as dt
 
@@ -6,7 +6,11 @@ from dotenv import load_dotenv
 from os import getenv
 from pathlib import Path
 
-from typing import Union, Sequence, Optional, Literal, Callable
+from typing import Union, Sequence, Optional, Literal, Callable, Iterable
+
+# Assure API extensions are loaded
+from .Stationarity import Stationarity
+from .Causality import Causality
 
 
 class SeriesAccessor:
@@ -35,7 +39,7 @@ class SeriesAccessor:
                    date_range: tuple[dt.date, dt.date],
                    reindex_freq: Optional[str] = None,
                    *,
-                   series_alias: Optional[Sequence[str]] = None) -> pd.DataFrame:
+                   series_alias: Optional[Union[Iterable[str] | Iterable[None]]] = None) -> pd.DataFrame:
 
         _out = []
         _freq = []
@@ -66,11 +70,15 @@ class SeriesAccessor:
         reindexed_series = [s.reindex(new_index) for s in _out]
         df = pd.concat(reindexed_series, axis=1)
 
+        assert hasattr(df, 'causality'), 'Causality API Extensions not loaded'
+        assert hasattr(df, 'stationarity'), 'Stationarity API Extensions not loaded'
+
         return df
 
     def fill(self,
              data: pd.DataFrame,
              methods: Sequence[Union[Literal['divide', 'bfill', 'ffill', 'mean', 'median', 'IQR_mean'], Callable[[pd.Series], pd.Series], None]]) -> pd.DataFrame:
+
         df = data.copy()
         if len(methods) == len(df.columns):
             methods = [*methods, *[None] * (len(df.columns) - len(methods))]
@@ -104,15 +112,15 @@ class SeriesAccessor:
         return series.ffill(inplace=False)
 
     @staticmethod
-    def _mean(series: pd.Series) -> pd.Series:
+    def _mean(series: pd.Series) -> float:
         return series.mean()
 
     @staticmethod
-    def _median(series: pd.Series) -> pd.Series:
+    def _median(series: pd.Series) -> float:
         return series.median()
 
     @staticmethod
-    def _IQR_mean(series: pd.Series) -> pd.Series:
+    def _IQR_mean(series: pd.Series) -> float:
         return series.loc[(series <= series.quantile(0.75)) & (series >= series.quantile(0.25))].mean()
 
     @property

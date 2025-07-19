@@ -7,6 +7,8 @@ DATA = Union[pd.Series, pd.DataFrame]
 
 
 class PVAL(float):
+    alpha: float
+
     def __new__(cls, val, alpha=0.05):
         obj = super().__new__(cls, val)
         obj.alpha = alpha

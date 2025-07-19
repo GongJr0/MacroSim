@@ -1,13 +1,13 @@
-from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.stattools import adfuller  # type: ignore
 
-import pandas as pd
+import pandas as pd  # type: ignore
 from pandas.api.extensions import register_dataframe_accessor
 
 from collections import Counter
 from dataclasses import dataclass
 
 from .StatsTypes import DATA, LAG, PVAL, SeriesInfo
-from typing import cast, Optional, Literal
+from typing import cast, Literal
 
 import numpy as np
 
@@ -25,20 +25,22 @@ class Stationarity:
                     ))
 
     @staticmethod
-    def adf(series: DATA) -> tuple[str, dict[int, PVAL]]:
-        assert series.ndim == 1, f"A one dimensional series is necessarry for adfuller. Passed input has {series.ndim} columns."
+    def adf(series: DATA) -> tuple[str, dict[LAG, PVAL]]:
+        assert series.ndim == 1, f"A one dimensional series is necessary for adfuller. Passed input has {series.ndim} columns."
         assert isinstance(series.name, str), f"Please do not use non string column names. Current name type: {type(series.name)}."
 
         # adfuller does not run tests for each lag a manual loop with autolag=None will be set up.
-        # This functionality is necessarry to determine the lag param which results in the max amount of critical p-values.
-        out: dict[int, PVAL] = {}
+        # This functionality is necessary to determine the lag param which results in the max number of critical p-values.
+        out: dict[LAG, PVAL] = {}
         for lag in range(1, Stationarity.max_lag(series)+1):
+            _lag: LAG = cast(LAG, lag)
             result: tuple = cast(tuple, adfuller(series, maxlag=lag, autolag=None))
-            out[lag] = PVAL(result[1])
+            out[_lag] = PVAL(result[1])
+
         return cast(str, series.name), out
 
     @staticmethod
-    def frame_adf(df: DATA) -> dict[str, dict[int, PVAL]]:
+    def frame_adf(df: DATA) -> dict[str, dict[LAG, PVAL]]:
         result = {}
         for col in df.columns:
             test = Stationarity.adf(df[col])
@@ -47,9 +49,9 @@ class Stationarity:
 
     @staticmethod
     def common_lag(adf_result: dict[str, dict[int, PVAL]]) -> LAG:
-        critical_lags =[]
+        critical_lags: list[LAG] = []
         for res in adf_result.values():
-            critical_lags = [*critical_lags, *[k for k, v in res.items() if v.reject]]
+            critical_lags = [*critical_lags, *[cast(LAG, k) for k, v in res.items() if v.reject]]
 
         counter = Counter(critical_lags)
         common_lag = min(
@@ -76,7 +78,7 @@ class StationarityResult:
 class StationarityAccessor:
     def __init__(self, pandas_obj: DATA):
         self._obj = pandas_obj
-        self._results: Optional[StationarityResult] = None
+        self._results: StationarityResult = None  # type: ignore
 
     def _compute_results(self):
         self._results = StationarityResult(self._obj)
