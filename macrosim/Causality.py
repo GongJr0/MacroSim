@@ -91,8 +91,7 @@ class CausalityAccessor:
         self._results: Optional[CausalityResult] = None
 
     def _compute_results(self):
-        if not self._results:
-            self._results = CausalityResult(self._obj)
+        self._results = CausalityResult(self._obj)
 
     @property
     def results(self) -> CausalityResult:

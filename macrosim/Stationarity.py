@@ -79,11 +79,12 @@ class StationarityAccessor:
         self._results: Optional[StationarityResult] = None
 
     def _compute_results(self):
-        if not self._results:
-            self._results = StationarityResult(self._obj)
+        self._results = StationarityResult(self._obj)
 
     @property
     def results(self):
+        if not self._results:
+            self._compute_results()
         return self._results
 
     @property
