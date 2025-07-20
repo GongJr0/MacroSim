@@ -2,9 +2,9 @@ import pandas as pd
 import sympy as sp  # type: ignore
 from sklearn.model_selection import train_test_split  # type: ignore
 from sklearn.metrics import r2_score, mean_absolute_error, mean_absolute_percentage_error, mean_squared_error  # type: ignore
-from typing import cast
+from typing import cast, Optional
 
-from pysr import PySRRegressor, TemplateExpressionSpec  # type: ignore
+from pysr import PySRRegressor, TemplateExpressionSpec, ExpressionSpec  # type: ignore
 
 from .StatsTypes import DATA, LAG
 
@@ -83,14 +83,29 @@ class AutoReg:
         return X, y.loc[X.index]
 
     @staticmethod
-    def model_config(X: pd.DataFrame) -> PySRRegressor:
-        size = len(X.columns) * 3
+    def get_expr(X: pd.DataFrame, target: str) -> TemplateExpressionSpec:
+        var_set = [col for col in X.columns if col.startswith(target)]
+        params = {"w": len(var_set)}
+
+        sub_expr = " + ".join([f"w[{n+1}] * {col}" for n, col in enumerate(var_set)])  # n+1 to match julia's 1-based indexing
+        return TemplateExpressionSpec(
+            expressions=["f"],
+            variable_names=var_set,
+            parameters=params,
+            combine=f"f({sub_expr})"
+        )
+
+    @staticmethod
+    def model_config(X: pd.DataFrame, spec: Optional[TemplateExpressionSpec] = None) -> PySRRegressor:
+        size = len(X.columns) * 2
+        spec = spec or ExpressionSpec()
         model = PySRRegressor(
             model_selection='best',
 
-            niterations=300,
+            niterations=200,
             maxsize=size,
 
+            expression_spec=spec,
 
             binary_operators=['+', '-', '*', '/', 'pow'],
             unary_operators=['exp', 'log', 'sqrt', 'sin', 'cos', 'tan'],
@@ -120,8 +135,11 @@ class AutoReg:
 
     @staticmethod
     def fit(df: pd.DataFrame, target: str) -> tuple[PySRRegressor, dict[str, float | int]]:
-        model = AutoReg.model_config(df)
         X, y = AutoReg.process_data(df, target)
+        spec = AutoReg.get_expr(X, target)
+
+        model = AutoReg.model_config(df, spec)
+
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
         model.fit(X_train, y_train)

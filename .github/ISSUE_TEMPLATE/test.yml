@@ -8,3 +8,7 @@ body:
     attributes:
       value: |
         Please provide the modules/features requiring test files.
+
+  - type: textarea
+    attributes:
+      label: "Fill here:"
