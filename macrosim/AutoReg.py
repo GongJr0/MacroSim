@@ -154,3 +154,4 @@ class AutoReg:
             'n_samples': len(X_train)
         }
         return model, fit_eval
+    
