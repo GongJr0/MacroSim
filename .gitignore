@@ -172,3 +172,5 @@ dist/*
 
 # Research Dist
 researchNotes/*
+
+.idea/*

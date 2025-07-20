@@ -10,7 +10,7 @@ repos:
           - >
             source ~/miniconda3/etc/profile.d/conda.sh &&
             conda activate MacroSim &&
-            pytest tests &&
+            pytest -p no:faulthandler tests &&
             mypy macrosim/ &&
             conda env export -n MacroSim --no-builds | grep -v "^prefix: " > ./dev/conda_env.yaml &&
             git diff --quiet ./dev/conda_env.yaml || git add ./dev/conda_env.yaml
