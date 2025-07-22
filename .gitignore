@@ -174,3 +174,4 @@ dist/*
 researchNotes/*
 
 .idea/*
+.idea/gbrowsers.xml
