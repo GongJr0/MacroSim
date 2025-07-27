@@ -303,12 +303,13 @@ class AutoReg:
             procs.append(proc)
 
         for p in procs:
+            assert isinstance(p.args, list)  # Type assertion for mypy
             stdout, stderr = p.communicate()
             if p.returncode != 0:
                 print(f"[STDOUT]: \n{stdout.decode('utf-8')}")
-                raise RuntimeError(f"[ERROR] Fit failed for batch {p.args[3]}:\n{stderr.decode('utf-8')}")
+                raise RuntimeError(f"[ERROR] Fit failed for batch {cast(str, p.args[3])}:\n{stderr.decode('utf-8')}")
             else:
-                print(f"[INFO] Fit completed for batch {p.args[3]}:\n{stdout.decode('utf-8')}")
+                print(f"[INFO] Fit completed for batch {cast(str, p.args[3])}:\n{stdout.decode('utf-8')}")
 
         models = {no: self.model_config(self.get_expr() if template_spec else None) for no, _ in batches}
         for no, model in models.items():

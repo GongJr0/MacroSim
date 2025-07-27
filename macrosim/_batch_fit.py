@@ -143,8 +143,8 @@ if __name__ == '__main__':
     if not os.path.exists('./batch/eq/'):
         os.makedirs('./batch/eq/', exist_ok=True)
 
-    with open(f'./batch/eq/eq_{batch_no}.pkl', 'wb') as f:
-        pickle.dump(eq_out, f)
+    with open(f'./batch/eq/eq_{batch_no}.pkl', 'wb') as f:  # type: ignore
+        pickle.dump(eq_out, f)  # type: ignore
 
     os.remove(batch_filepath)  # Clean up the batch file after processing
     exit(0)

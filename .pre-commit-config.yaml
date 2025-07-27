@@ -8,6 +8,7 @@ repos:
         types: [python]
         args:
           - >
+            set -e &&
             source ~/miniconda3/etc/profile.d/conda.sh &&
             conda activate MacroSim &&
             pytest -p no:faulthandler tests &&
