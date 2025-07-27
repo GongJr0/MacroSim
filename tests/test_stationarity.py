@@ -1,7 +1,7 @@
 from numbers import Integral
 from test_utils import is_integer_strict
 
-from macrosim.Stationarity import StationarityResult
+from macrosim.stats.Stationarity import StationarityResult
 
 
 def test_stationarity_attrs(df):

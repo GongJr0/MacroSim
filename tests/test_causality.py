@@ -1,7 +1,7 @@
 from numbers import Integral
 from test_utils import is_integer_strict
 
-from macrosim.Causality import CausalityResult
+from macrosim.stats.Causality import CausalityResult
 
 
 def test_causality_attrs(df):

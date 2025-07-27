@@ -6,7 +6,7 @@ from pandas.api.extensions import register_dataframe_accessor
 from collections import Counter
 from dataclasses import dataclass
 
-from .StatsTypes import DATA, LAG, PVAL, SeriesInfo
+from macrosim.stats.StatsTypes import DATA, LAG, PVAL, SeriesInfo
 from typing import cast, Literal
 
 import numpy as np

@@ -4,7 +4,7 @@ import warnings
 from itertools import permutations
 from collections import Counter
 from typing import Literal, cast
-from .StatsTypes import DATA, LAG, PVAL, TestStats, SeriesInfo
+from macrosim.stats.StatsTypes import DATA, LAG, PVAL, TestStats, SeriesInfo
 from dataclasses import dataclass
 
 import pandas as pd

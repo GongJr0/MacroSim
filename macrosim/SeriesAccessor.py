@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Union, Sequence, Optional, Literal, Callable, Iterable
 
 # Assure API extensions are loaded
-from .Stationarity import Stationarity  # type: ignore
-from .Causality import Causality  # type: ignore
+from macrosim.stats.Stationarity import Stationarity  # type: ignore
+from macrosim.stats.Causality import Causality  # type: ignore
 
 
 class SeriesAccessor:
