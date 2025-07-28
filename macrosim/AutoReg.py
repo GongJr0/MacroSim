@@ -3,7 +3,9 @@ import numpy as np
 import sympy as sp  # type: ignore
 import pickle
 from subprocess import Popen, PIPE
+import threading
 import os
+import datetime as dt
 
 from sklearn.model_selection import train_test_split  # type: ignore
 from sklearn.metrics import r2_score, mean_absolute_error, mean_absolute_percentage_error, mean_squared_error  # type: ignore
@@ -12,7 +14,7 @@ from sklearn.utils import shuffle  # type: ignore
 from typing import cast, Optional
 import warnings
 
-from pysr import PySRRegressor, TemplateExpressionSpec, ExpressionSpec  # type: ignore
+from pysr import PySRRegressor, TemplateExpressionSpec, ExpressionSpec, TensorBoardLoggerSpec  # type: ignore
 
 from macrosim.stats.StatsTypes import DATA, LAG
 
@@ -106,7 +108,7 @@ class AutoReg:
         self.target: str = target
 
         self.freq: int = AutoReg.get_freq(df)
-        self.n_lags = cast(LAG, 2 * self.freq)  # 2m heuristic, can be adjusted based on domain knowledge
+        self.n_lags = cast(LAG, self.freq)  # 2m heuristic, can be adjusted based on domain knowledge
 
         self.causal_lag_positions: dict[str, int] = {}  # Positions of causal lags in the DataFrame, populated at process_data time
 
@@ -174,33 +176,47 @@ class AutoReg:
             combine=f"f({sub_expr})"
         )
 
-    def model_config(self, spec: Optional[TemplateExpressionSpec] = None) -> PySRRegressor:
-        size = len(self.X.columns) // 2
+    def model_config(self,
+                     spec: Optional[TemplateExpressionSpec] = None,
+                     log: bool = True,
+                     logdir_child: Optional[str] = None) -> PySRRegressor:
+
+        size = len(self.X.columns) * 2
         spec = spec or ExpressionSpec()
+        if log:
+            dir_name = f"logs/{logdir_child}" if logdir_child else f"logs/{self.target}_{dt.datetime.now().strftime('%b-%d_%H-%M-%S')}"
+            logger = TensorBoardLoggerSpec(
+                log_dir=dir_name,
+                log_interval=5,
+                overwrite=False
+            )
+        else:
+            logger = None
+
         model = PySRRegressor(
             model_selection='best',
 
-            niterations=20,
+            niterations=200,
             maxsize=size if size > 7 else 7,
 
             expression_spec=spec,
 
             binary_operators=['+', '-', '*', '/', 'pow'],
-            unary_operators=['exp', 'log', 'sqrt'],#, 'sin', 'cos', 'tan'],
+            unary_operators=['exp', 'log', 'sqrt', 'sin', 'cos', 'tan'],
 
             constraints={
-                # 'sin': 2,
-                # 'cos': 2,
-                # 'tan': 2,
+                'sin': 2,
+                'cos': 2,
+                'tan': 2,
 
                 'exp': 2,
                 'log': 2,
                 'sqrt': 3,
                 'pow': (-1, 2)
             },
-            nested_constraints={#'sin': {'cos': 0, 'sin': 2},
-            #                     'cos': {'sin': 0, 'cos': 2},
-            #                     'tan': {'sin': 1, 'cos': 1},
+            nested_constraints={'sin': {'cos': 0, 'sin': 2},
+                                'cos': {'sin': 0, 'cos': 2},
+                                'tan': {'sin': 1, 'cos': 1},
                                 'exp': {'log': 0},
                                 'log': {'exp': 0},
                                 },
@@ -209,6 +225,7 @@ class AutoReg:
 
             temp_equation_file=True,
             verbosity=1,
+            logger_spec=logger,
         )
         return model
 
@@ -248,14 +265,15 @@ class AutoReg:
 
         return enumerate(zip(X_batched, y_batched)), (X_test, y_test)
 
-    def batch_fit(self, n: int, template_spec: bool=True) -> _BatchedPredictor:
+    def batch_fit(self, n: int, template_spec: bool = True) -> _BatchedPredictor:
         train, test = self.shuffle_batch(n)
         spec = self.get_expr() if template_spec else None
+        log_dir = f"{self.target}_{dt.datetime.now().strftime('%b-%d_%H-%M')}"
 
         fitted: dict[int, PySRRegressor] = {}
         for i, data in train:
             X, y = data
-            model = self.model_config(spec)
+            model = self.model_config(spec, logdir_child=log_dir + f"/{i}")
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
@@ -281,6 +299,13 @@ class AutoReg:
         return self.batched_model
 
     def _batch_fit_parallel(self, n: int, template_spec: bool = True) -> _BatchedPredictor:
+        def monitor_process(p, batch_id):
+            stdout, stderr = p.communicate()
+            if p.returncode != 0:
+                print(f"[ERROR] Batch {batch_id} failed:\n{stderr.decode()}")
+            else:
+                print(f"[INFO] Batch {batch_id} completed:\n{stdout.decode()}")
+
         train, test = self.shuffle_batch(n)
 
         batches: list[tuple[int, tuple[pd.DataFrame, DATA]]] = list(train)
@@ -296,41 +321,47 @@ class AutoReg:
                 pickle.dump(data, f)  # type: ignore
 
         procs = []
+        threads = []
         for no, _ in batches:
             proc = Popen(['python', 'macrosim/_batch_fit.py', f'./batch/data/data_{no}.pkl', str(no), str(template_spec)],
                          stdout=PIPE,
                          stderr=PIPE)
             procs.append(proc)
 
+            t = threading.Thread(target=monitor_process, args=(proc, no))
+            t.start()
+            threads.append(t)
+
         for p in procs:
-            assert isinstance(p.args, list)  # Type assertion for mypy
-            stdout, stderr = p.communicate()
-            if p.returncode != 0:
-                print(f"[STDOUT]: \n{stdout.decode('utf-8')}")
-                raise RuntimeError(f"[ERROR] Fit failed for batch {cast(str, p.args[3])}:\n{stderr.decode('utf-8')}")
-            else:
-                print(f"[INFO] Fit completed for batch {cast(str, p.args[3])}:\n{stdout.decode('utf-8')}")
+            for t in threads:
+                t.join()
 
         models = {no: self.model_config(self.get_expr() if template_spec else None) for no, _ in batches}
         for no, model in models.items():
-            with open(f'./batch/eq/eq_{no}.pkl', 'rb') as f:
+            with open(f'./batch/eq/eq_{no}.pkl', 'rb') as f:  # type: ignore
                 best = pickle.load(f)
                 if isinstance(model.expression_spec, TemplateExpressionSpec):
-                    varnames = model.expression_spec.variable_names
+                    varnames = sp.symbols(model.expression_spec.variable_names)
                     eq = best['lambda_format']
+                    eq_str = best['equation']
+                    loss = best['loss']
+                    complexity = best['complexity']
+                    score = best['score']
                     eq_lambda = sp.lambdify(varnames, eq, modules='numpy')
 
             model.fit(X=X_dummy.to_frame().T, y=np.array([y_dummy]))
 
             best = model.get_best().to_frame().copy()
-            best['equation'] = str(eq)
+            best['equation'] = eq_str
             best['labmda_format'] = eq_lambda
+            best['loss'] = loss
+            best['complexity'] = complexity
+            best['score'] = score
 
             model.equations_ = best.T
-            print(model.equations_['loss'])
 
         X_test, y_test = test
-        preds = sum([m.predict(X_test) for m in models.values()]) / len(models)
+        preds = sum([m.predict(X_test, 0) for m in models.values()]) / len(models)
 
         fit_eval = {
             'R^2': r2_score(y_test, preds),

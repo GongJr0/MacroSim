@@ -175,3 +175,6 @@ researchNotes/*
 
 .idea/*
 .idea/gbrowsers.xml
+/batch
+/logs
+*.pkl

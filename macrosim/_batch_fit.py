@@ -1,10 +1,12 @@
 # Args: [batch_filepath, batch_no, model_spec: Optional[Literal['True', 'False']] = 'True']
 # Returns: None
+import datetime as dt
 import os
 import pandas as pd
 import numpy as np
 from typing import Optional, cast, NewType, Callable, Any
-from pysr import PySRRegressor, TemplateExpressionSpec, ExpressionSpec  # type: ignore
+
+from pysr import PySRRegressor, TemplateExpressionSpec, ExpressionSpec, TensorBoardLoggerSpec  # type: ignore
 import sys
 import pickle  # type: ignore
 import re
@@ -38,14 +40,28 @@ def get_expr(X: pd.DataFrame, target: str) -> TemplateExpressionSpec:
     )
 
 
-def model_config(X: pd.DataFrame, spec: Optional[TemplateExpressionSpec] = None) -> PySRRegressor:
-    size = len(X.columns) #* 2
+def model_config(X: pd.DataFrame,
+                 target: str,
+                 spec: Optional[TemplateExpressionSpec] = None,
+                 log: bool = True,
+                 logdir_child: Optional[str] = None) -> PySRRegressor:
+    size = len(X.columns) * 2
     spec = spec or ExpressionSpec()
+    if log:
+        dir_name = f"logs/{logdir_child}" if logdir_child else f"logs/{target}_{dt.datetime.now().strftime('%b-%d_%H-%M-%S')}"
+        logger = TensorBoardLoggerSpec(
+            log_dir=dir_name,
+            log_interval=5,
+            overwrite=False
+        )
+    else:
+        logger = None
+
     model = PySRRegressor(
         model_selection='best',
 
-        niterations=50,
-        maxsize=size,
+        niterations=200,
+        maxsize=size if size > 7 else 7,
 
         expression_spec=spec,
 
@@ -72,6 +88,8 @@ def model_config(X: pd.DataFrame, spec: Optional[TemplateExpressionSpec] = None)
         elementwise_loss='L2DistLoss()',
 
         temp_equation_file=True,
+        verbosity=1,
+        logger_spec=logger,
     )
     return model
 
@@ -94,29 +112,27 @@ def subs_expr(model: PySRRegressor) -> pd.Series:
     func = expr.combine.replace("f(", "").replace(")", "")
     func_inner = re.sub(r"w\[\d+\]", replacer, func)
 
-    replacements = [
-        ("#1", func_inner),
-        ("f =", ""),
-        ("+-", "-"),
-        ("-+", "-"),
-    ]
     func_full = outer.replace("#1", func_inner).replace("f =", "").replace("+ -", "- ").replace("- +", "- ").strip()
     varnames = list(model.feature_names_in_)
     symbol_map = {name: sp.Symbol(name) for name in varnames}
 
     eq = sp.sympify(func_full, locals={**MODEL_LOCALS, **symbol_map})  # type: ignore
-    model.equations_.loc[model.get_best().name, 'lambda_format'] = eq
-    print(model.get_best())
-    return model.get_best()
+
+    best_df = model.get_best().copy()
+    best_df['equation'] = str(eq)
+    best_df['lambda_format'] = eq
+    best_df['julia_expression'] = None
+    return best_df
 
 
 def fit(X: pd.DataFrame, y: pd.Series | pd.DataFrame, template_spec: bool = True) -> PySRRegressor:
     target = str(y.name) if isinstance(y, pd.Series) else y.columns[0]
     spec = get_expr(X=X, target=target) if template_spec else ExpressionSpec()
+    log_dir = f"{target}_{dt.datetime.now().strftime('%b-%d_%H-%M')}/{batch_no}"
 
     spec = get_expr(X=X, target=target)
 
-    model = model_config(X=X, spec=spec)
+    model = model_config(X=X, target=target, spec=spec)
     model.fit(X=X, y=y)
 
     return model

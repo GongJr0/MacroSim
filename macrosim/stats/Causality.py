@@ -2,16 +2,17 @@ from statsmodels.tsa.stattools import grangercausalitytests as granger  # type: 
 
 import warnings
 from itertools import permutations
-from collections import Counter
-from typing import Literal, cast
-from macrosim.stats.StatsTypes import DATA, LAG, PVAL, TestStats, SeriesInfo
+from collections import defaultdict, Counter
+from typing import Literal, cast, Any
+from macrosim.StatsTypes import DATA, LAG, PVAL, TestStats, SeriesInfo
 from dataclasses import dataclass
+from copy import deepcopy
 
 import pandas as pd
 from pandas.api.extensions import register_dataframe_accessor
 
 import numpy as np
-
+import warnings
 
 class Causality:
     def __init__(self) -> None:
@@ -51,7 +52,49 @@ class Causality:
 
         for pair in pairs:
             causality_matrix[pair[1]][pair[0]] = Causality._gct(df[pair[0]], df[pair[1]], stat, alpha=alpha)
+
         return causality_matrix
+
+    @staticmethod
+    def rolling_perm_gct(
+            df: DATA,
+            stat: Literal['F', 'chi2', 'lr'] = 'F',
+            alpha=0.05,
+            batch_size=30
+    ) -> dict[str, dict[str, list[tuple[LAG, PVAL]]]]:
+
+        out: dict[str, dict[str, list[tuple[LAG, PVAL]]]] = {col: {} for col in df.columns}  # type: ignore
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=FutureWarning)
+            batched = np.array_split(df, len(df) // batch_size)
+
+        # Run causality tests on batches
+        for batch in batched:
+            batch_result = Causality.perm_gct(batch, stat, alpha)
+
+            for col, inner_result in batch_result.items():
+                for inner_col, results in inner_result.items():
+                    if inner_col not in out[col]:
+                        out[col][inner_col] = []
+                    out[col][inner_col].extend(results)
+
+        # Aggregate all lag results per (col, inner_col) pair
+        for col, inner in out.items():
+            for inner_col, res in inner.items():
+                df_lags = pd.DataFrame(res, columns=["lag", "pval"])
+                grouped = df_lags.groupby("lag", as_index=False).agg({'pval': 'mean'})
+
+                aggregate_lag_pvals: list[tuple[LAG, PVAL]] = []
+                for _, row in grouped.iterrows():
+                    lag = cast(LAG, row['lag'])
+                    pval = PVAL(row['pval'], alpha=alpha)
+                    aggregate_lag_pvals.append((cast(LAG, int(lag)), pval))
+
+                out[col][inner_col] = aggregate_lag_pvals
+
+        return out
+
+
 
     @staticmethod
     def common_lag(gct_res: dict[str, dict[str, list[tuple[LAG, PVAL]]]]) -> LAG:
@@ -75,12 +118,14 @@ class CausalityResult:
     df: DATA
 
     def __post_init__(self):
-        self.tests = Causality.perm_gct(self.df)
+        self.rolling = Causality.rolling_perm_gct(self.df)
+        self.tests = Causality.rolling_perm_gct(self.df)
         self.is_causal = {
             col: SeriesInfo.CAUSAL if any(inner for inner in self.tests[col].values()) else SeriesInfo.NON_CAUSAL
             for col in self.tests.keys()
         }
         self.common_lag = Causality.common_lag(self.tests)
+
 
 
 @register_dataframe_accessor("causality")
@@ -105,6 +150,13 @@ class CausalityAccessor:
             self._compute_results()
 
         return self._results.tests
+
+    @property
+    def rolling(self) -> dict[str, dict[str, list[tuple[LAG, PVAL]]]]:
+        if not self._results:
+            self._compute_results()
+
+        return self._results.rolling
 
     @property
     def is_causal(self) -> dict[str, Literal[SeriesInfo.CAUSAL, SeriesInfo.NON_CAUSAL]]:
