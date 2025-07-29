@@ -3,10 +3,9 @@ from statsmodels.tsa.stattools import grangercausalitytests as granger  # type: 
 import warnings
 from itertools import permutations
 from collections import defaultdict, Counter
-from typing import Literal, cast, Any
-from macrosim.StatsTypes import DATA, LAG, PVAL, TestStats, SeriesInfo
+from typing import Literal, cast, Optional
+from macrosim.stats.StatsTypes import FREQ_TO_PERIODS_PER_YEAR, DATA, LAG, PVAL, TestStats, SeriesInfo
 from dataclasses import dataclass
-from copy import deepcopy
 
 import pandas as pd
 from pandas.api.extensions import register_dataframe_accessor
@@ -14,16 +13,50 @@ from pandas.api.extensions import register_dataframe_accessor
 import numpy as np
 import warnings
 
+"""
+Causality is assessed through Granger Causality tests, using the F statistic by default.
+max_lags are weighted by a factor of lend(df)/(10*observation_frequency) to prioritize the attainment of 
+decent degrees of freedom.
+
+Batch testing is used to assess aggregate causality over portions of the sample, spanning the entire dataset.
+batch_size is set to 4*observation_frequency by default, where each batch covers 4 years of data. If the dataset is
+not large enough, batching will not be used, and the entire dataset will be tested at once.
+"""
+
+
 class Causality:
     def __init__(self) -> None:
         # Static Class
         ...
 
     @staticmethod
+    def get_freq(df: DATA) -> int:
+        assert isinstance(df.index, pd.DatetimeIndex), "DatetimeIndex is mandatory for frequency inference."
+        assert isinstance((freq_full := pd.infer_freq(df.index)), str), (
+            "Frequency inference failed. Ensure the index is"
+            " a DatetimeIndex with a consistent frequency.")
+
+        freq_base = freq_full.split('-')[0]  # Get the base frequency (e.g., 'D', 'M', 'Q', etc.)
+        freq = FREQ_TO_PERIODS_PER_YEAR[freq_base]
+        return freq
+
+    @staticmethod
+    def get_batch_size(data: DATA) -> int:
+        freq = Causality.get_freq(data)
+        if (bsize := 4*freq) > len(data):
+            warnings.warn(f"Consider increasing observation count if possible. "
+                          f"{len(data)} observations found. "
+                          f"There's not enough observations to use the default batch size of 4*df_frequency. "
+                          f"Using single batch instead.",
+                          category=UserWarning)
+            bsize = len(data)
+
+        return bsize
+
+    @staticmethod
     def max_lag(data: DATA) -> int:
-        return int(np.ceil(
-            np.sqrt(data.shape[0])
-        ))
+        freq = Causality.get_freq(data)
+        return ((len(data)/(20*freq))*np.log(len(data))).round()
 
     @staticmethod
     def _gct(x: DATA, y: DATA, stat: Literal['F', 'chi2', 'lr'], alpha=0.05) -> list[tuple[LAG, PVAL]]:
@@ -59,18 +92,21 @@ class Causality:
     def rolling_perm_gct(
             df: DATA,
             stat: Literal['F', 'chi2', 'lr'] = 'F',
-            alpha=0.05,
-            batch_size=30
+            alpha: float = 0.05,
+            batch_size: Optional[int] = None
     ) -> dict[str, dict[str, list[tuple[LAG, PVAL]]]]:
 
         out: dict[str, dict[str, list[tuple[LAG, PVAL]]]] = {col: {} for col in df.columns}  # type: ignore
+        if batch_size is None:
+            batch_size = Causality.get_batch_size(df)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=FutureWarning)
             batched = np.array_split(df, len(df) // batch_size)
 
         # Run causality tests on batches
         for batch in batched:
-            batch_result = Causality.perm_gct(batch, stat, alpha)
+
+            batch_result = Causality.perm_gct(cast(pd.DataFrame, batch), stat, alpha)
 
             for col, inner_result in batch_result.items():
                 for inner_col, results in inner_result.items():
@@ -119,7 +155,7 @@ class CausalityResult:
 
     def __post_init__(self):
         self.rolling = Causality.rolling_perm_gct(self.df)
-        self.tests = Causality.rolling_perm_gct(self.df)
+        self.tests = Causality.perm_gct(self.df)
         self.is_causal = {
             col: SeriesInfo.CAUSAL if any(inner for inner in self.tests[col].values()) else SeriesInfo.NON_CAUSAL
             for col in self.tests.keys()

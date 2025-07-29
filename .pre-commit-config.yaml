@@ -1,17 +1,44 @@
+fail_fast: true
 repos:
   - repo: local
     hooks:
-      - id: pre-commit-sequence
-        name: Pre Commit Sequence (Tests, Type Checks, Env Dependency Update)
-        entry: bash -c
+
+      - id: mypy-check
+        name: Type Check with mypy
+        entry: bash
         language: system
-        types: [python]
         args:
+          - -c
           - >
-            set -e &&
+            set -euo pipefail &&
             source ~/miniconda3/etc/profile.d/conda.sh &&
             conda activate MacroSim &&
-            pytest -p no:faulthandler tests &&
-            mypy macrosim/ &&
+            mypy macrosim/
+        types: [python]
+
+      - id: pytest-check
+        name: Run Tests with Pytest
+        entry: bash
+        language: system
+        args:
+          - -c
+          - >
+            set -euo pipefail &&
+            source ~/miniconda3/etc/profile.d/conda.sh &&
+            conda activate MacroSim &&
+            pytest -p no:faulthandler tests
+        types: [python]
+
+      - id: export-conda-env
+        name: Export Conda Environment
+        entry: bash
+        language: system
+        args:
+          - -c
+          - >
+            set -euo pipefail &&
+            source ~/miniconda3/etc/profile.d/conda.sh &&
+            conda activate MacroSim &&
             conda env export -n MacroSim --no-builds | grep -v "^prefix: " > ./dev/conda_env.yaml &&
             git diff --quiet ./dev/conda_env.yaml || git add ./dev/conda_env.yaml
+        types: [python]

@@ -5,6 +5,22 @@ import pandas as pd
 
 DATA = Union[pd.Series, pd.DataFrame]
 
+FREQ_TO_PERIODS_PER_YEAR = {
+    "D": 365,
+    "B": 252,  # Assumed 252, can change year to year
+    "W": 52,
+    "M": 12,
+    "MS": 12,
+    "Q": 4,
+    "QS": 4,
+    "A": 1,
+    "AS": 1,
+    "Y": 1,
+    "H": 24 * 365,
+    "T": 60 * 24 * 365,
+    "min": 60 * 24 * 365,
+    "S": 60 * 60 * 24 * 365,
+}
 
 class PVAL(float):
     alpha: float

@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import numpy as np
 from typing import Optional, cast, NewType, Callable, Any
+import builtins
 
 from pysr import PySRRegressor, TemplateExpressionSpec, ExpressionSpec, TensorBoardLoggerSpec  # type: ignore
 import sys
@@ -23,6 +24,14 @@ MODEL_LOCALS = {
 }
 
 ExprStr = NewType("ExprStr", str)
+
+
+def ssqrt(x: float) -> float:
+    return np.sign(x) * np.sqrt(np.abs(x))
+
+
+builtins.ssqrt = ssqrt  # type: ignore
+
 
 # Duplicate Functions from AutoReg.py to avoid import overhead
 def get_expr(X: pd.DataFrame, target: str) -> TemplateExpressionSpec:
@@ -45,6 +54,17 @@ def model_config(X: pd.DataFrame,
                  spec: Optional[TemplateExpressionSpec] = None,
                  log: bool = True,
                  logdir_child: Optional[str] = None) -> PySRRegressor:
+    # ==== Custom Operators ====
+    def safe_sqrt(x) -> float:
+        """This function has been used as a sign safe root replacement in many academic settings.
+        For a specific example matching the domain of AutoReg, refer to:
+
+        Teräsvirta, T. (1994). Specification, Estimation, and Evaluation of Smooth Transition Autoregressive Models.
+        Journal of the American Statistical Association."""
+        return np.sign(x) * np.sqrt(np.abs(x))
+
+    # ===========================
+
     size = len(X.columns) * 2
     spec = spec or ExpressionSpec()
     if log:
@@ -66,7 +86,8 @@ def model_config(X: pd.DataFrame,
         expression_spec=spec,
 
         binary_operators=['+', '-', '*', '/', 'pow'],
-        unary_operators=['exp', 'log', 'sqrt', 'sin', 'cos', 'tan'],
+        unary_operators=['exp', 'log', 'ssqrt(x) = sign(x)*sqrt(abs(x))', 'sin', 'cos', 'tan'],
+        extra_sympy_mappings={'ssqrt': safe_sqrt},
 
         constraints={
             'sin': 2,
@@ -94,7 +115,7 @@ def model_config(X: pd.DataFrame,
     return model
 
 
-def subs_expr(model: PySRRegressor) -> pd.Series:
+def subs_expr(model: PySRRegressor) -> tuple[list, pd.Series]:
     assert isinstance(model.expression_spec, TemplateExpressionSpec), "model.expression_spec must be a TemplateExpressionSpec"
 
     expr: TemplateExpressionSpec = model.expression_spec
@@ -122,7 +143,7 @@ def subs_expr(model: PySRRegressor) -> pd.Series:
     best_df['equation'] = str(eq)
     best_df['lambda_format'] = eq
     best_df['julia_expression'] = None
-    return best_df
+    return varnames, best_df
 
 
 def fit(X: pd.DataFrame, y: pd.Series | pd.DataFrame, template_spec: bool = True) -> PySRRegressor:
@@ -154,13 +175,13 @@ if __name__ == '__main__':
 
     target = cast(str, y.name) if isinstance(y, pd.Series) else cast(str, y.columns[0])
     sr = fit(X=X, y=y, template_spec=template)
-    eq_out = subs_expr(sr)
+    features, eq_out = subs_expr(sr)
 
     if not os.path.exists('./batch/eq/'):
         os.makedirs('./batch/eq/', exist_ok=True)
 
     with open(f'./batch/eq/eq_{batch_no}.pkl', 'wb') as f:  # type: ignore
-        pickle.dump(eq_out, f)  # type: ignore
+        pickle.dump((features, eq_out), f)  # type: ignore
 
     os.remove(batch_filepath)  # Clean up the batch file after processing
     exit(0)

@@ -2,10 +2,13 @@ import pandas as pd
 import numpy as np
 import sympy as sp  # type: ignore
 import pickle
-from subprocess import Popen, PIPE
+from subprocess import run, PIPE, Popen
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import threading
+import psutil
 import os
 import datetime as dt
+import builtins
 
 from sklearn.model_selection import train_test_split  # type: ignore
 from sklearn.metrics import r2_score, mean_absolute_error, mean_absolute_percentage_error, mean_squared_error  # type: ignore
@@ -16,26 +19,25 @@ import warnings
 
 from pysr import PySRRegressor, TemplateExpressionSpec, ExpressionSpec, TensorBoardLoggerSpec  # type: ignore
 
-from macrosim.stats.StatsTypes import DATA, LAG
+from macrosim.stats.StatsTypes import DATA, LAG, FREQ_TO_PERIODS_PER_YEAR
+
+
+def run_batch_process(args):
+    no, template_spec = args
+    cmd = ['python', 'macrosim/_batch_fit.py', f'./batch/data/data_{no}.pkl', str(no), str(template_spec)]
+
+    proc = run(cmd, stdout=PIPE, stderr=PIPE)
+    return no, proc.stdout.decode(), proc.stderr.decode()
+
+
+def ssqrt(x: float) -> float:
+    return np.sign(x) * np.sqrt(np.abs(x))
+
+
+if 'ssqrt' not in builtins.__dict__:
+    builtins.ssqrt = ssqrt  # type: ignore
 
 os.environ["PYTHON_JULIACALL_AUTOLOAD_IPYTHON_EXTENSION"] = "no"
-
-FREQ_TO_PERIODS_PER_YEAR = {
-    "D": 365,
-    "B": 252,  # Assumed 252, can change year to year
-    "W": 52,
-    "M": 12,
-    "MS": 12,
-    "Q": 4,
-    "QS": 4,
-    "A": 1,
-    "AS": 1,
-    "Y": 1,
-    "H": 24 * 365,
-    "T": 60 * 24 * 365,
-    "min": 60 * 24 * 365,
-    "S": 60 * 60 * 24 * 365,
-}
 
 
 class _BatchedPredictor:
@@ -45,7 +47,13 @@ class _BatchedPredictor:
                  target_lags: int,
                  causal_lag_positions: dict[str, int],
                  fit_eval: Optional[dict[str, float | int]] = None):
+
+        if isinstance(models[0], PySRRegressor):
+            eqs = {i: model.get_best()['lambda_format'] for i, model in models.items()}
+        else:
+            eqs = models
         self._models = models
+        self._eqs = eqs
         self._target = target
         self._fit_eval = fit_eval or {}
         self._target_lags = target_lags
@@ -57,27 +65,28 @@ class _BatchedPredictor:
     def __str__(self):
         return self.fit_eval.__str__()
 
-    def reconstruct_lags(self, X: pd.DataFrame) -> pd.DataFrame:
+    def reconstruct_lags(self, X: pd.DataFrame, t_range: pd.DatetimeIndex) -> pd.DataFrame:
         assert isinstance(X, pd.DataFrame), "X must be a DataFrame with a valid index."
         assert self._target in X.columns, f"Target '{self._target}' not found in DataFrame."
 
         target = X[self._target].copy()
-        target_lags = [target.shift(lag) for lag in range(1, self._target_lags)]  # Current target is lag-1 when predicting t+1
+        target_lags = [target.shift(lag-1) for lag in range(1, self._target_lags)]  # Current target is lag_1 when predicting t+1
 
         target_df = pd.concat([target, *target_lags], axis=1)
         target_df.columns = [f"{self._target}_L{lag}" for lag in range(1, self._target_lags + 1)]  # Feature name mathing
 
-        causal_lags = pd.concat([X[causal].shift(lag-1) for causal, lag in self._causal_lag_positions.items()], axis=1)
+        causal_lags = pd.concat([X[causal].shift(lag) for causal, lag in self._causal_lag_positions.items()], axis=1)
         causal_lags.columns = [f"{causal}_L{lag}" for causal, lag in self._causal_lag_positions.items()]
 
         X = pd.concat([target_df, causal_lags], axis=1)
         X = X.dropna(how='any')  # Drop rows with any NaN values
+        X = X.reindex(t_range)
         return X
 
-    def predict(self, X: pd.DataFrame) -> pd.Series:
-        X = self.reconstruct_lags(X)
+    def predict(self, X: pd.DataFrame, t_range: pd.DatetimeIndex) -> pd.Series:
+        X = self.reconstruct_lags(X, t_range)
 
-        preds = sum([model.predict(X.to_numpy()) for model in self.models.values()]) / len(self.models)
+        preds = sum([eq(*X.values.T) for eq in self.eqs.values()]) / len(self.eqs)
         return pd.Series(preds, index=X.index, name='prediction')
 
     @property
@@ -87,6 +96,10 @@ class _BatchedPredictor:
     @property
     def models(self) -> dict[int, PySRRegressor]:
         return self._models
+
+    @property
+    def eqs(self) -> dict[int, sp.Lambda]:
+        return self._eqs
 
     @property
     def fit_eval(self) -> dict[str, float | int]:
@@ -108,14 +121,14 @@ class AutoReg:
         self.target: str = target
 
         self.freq: int = AutoReg.get_freq(df)
-        self.n_lags = cast(LAG, self.freq)  # 2m heuristic, can be adjusted based on domain knowledge
+        self.n_lags = cast(LAG, 2*self.freq)  # 2m heuristic, can be adjusted based on domain knowledge
 
         self.causal_lag_positions: dict[str, int] = {}  # Positions of causal lags in the DataFrame, populated at process_data time
 
         self.X, self.y = self.process_data()
 
-        self.model: Optional[PySRRegressor] = None  # Populated when fitting non-batched models
-        self.batched_model: Optional[_BatchedPredictor] = None  # Populated when fitting batched models
+        self.model: PySRRegressor = cast(PySRRegressor, None)  # Populated when fitting non-batched models
+        self.batched_model: _BatchedPredictor = cast(_BatchedPredictor, None)  # Populated when fitting batched models
 
     @staticmethod
     def get_freq(df: DATA) -> int:
@@ -181,6 +194,19 @@ class AutoReg:
                      log: bool = True,
                      logdir_child: Optional[str] = None) -> PySRRegressor:
 
+        # ==== Custom Operators ====
+        def safe_sqrt(x) -> float:
+            """This function has been used as a sign safe root replacement in many academic settings.
+            For a specific example matching the domain of AutoReg, refer to:
+
+            Teräsvirta, T. (1994). Specification, Estimation, and Evaluation of Smooth Transition Autoregressive Models.
+            Journal of the American Statistical Association.
+
+            builtins alias: ssqrt
+            """
+            return np.sign(x) * np.sqrt(np.abs(x))
+        # ===========================
+
         size = len(self.X.columns) * 2
         spec = spec or ExpressionSpec()
         if log:
@@ -188,7 +214,7 @@ class AutoReg:
             logger = TensorBoardLoggerSpec(
                 log_dir=dir_name,
                 log_interval=5,
-                overwrite=False
+                overwrite=False,
             )
         else:
             logger = None
@@ -202,7 +228,8 @@ class AutoReg:
             expression_spec=spec,
 
             binary_operators=['+', '-', '*', '/', 'pow'],
-            unary_operators=['exp', 'log', 'sqrt', 'sin', 'cos', 'tan'],
+            unary_operators=['exp', 'log', 'ssqrt(x) = sign(x)*sqrt(abs(x))','sin', 'cos', 'tan'],
+            extra_sympy_mappings={'ssqrt': safe_sqrt},
 
             constraints={
                 'sin': 2,
@@ -265,7 +292,10 @@ class AutoReg:
 
         return enumerate(zip(X_batched, y_batched)), (X_test, y_test)
 
-    def batch_fit(self, n: int, template_spec: bool = True) -> _BatchedPredictor:
+    def batch_fit(self, n: int, *, template_spec: bool = True, parallel: bool = True) -> _BatchedPredictor:
+        if parallel:
+            return self._batch_fit_parallel(n, template_spec)
+
         train, test = self.shuffle_batch(n)
         spec = self.get_expr() if template_spec else None
         log_dir = f"{self.target}_{dt.datetime.now().strftime('%b-%d_%H-%M')}"
@@ -310,8 +340,6 @@ class AutoReg:
 
         batches: list[tuple[int, tuple[pd.DataFrame, DATA]]] = list(train)
         dummy = batches[0][1]
-        X_dummy = dummy[0].iloc[0]
-        y_dummy = dummy[1].iloc[0]
 
         if not os.path.exists('./batch/data/'):
             os.makedirs('./batch/data/', exist_ok=True)
@@ -332,36 +360,42 @@ class AutoReg:
             t.start()
             threads.append(t)
 
-        for p in procs:
-            for t in threads:
-                t.join()
+        for t in threads:
+            t.join()
 
+
+        # task_args = [(no, template_spec) for no, _ in batches]
+        #
+        # cpus = psutil.cpu_count(logical=False)
+        # with ProcessPoolExecutor(max_workers=cpus) as executor:
+        #     futures = {executor.submit(run_batch_process, args): args for args in task_args}
+        #
+        #     for future in as_completed(futures):
+        #         no, out, err = future.result()
+        #         print(f"[{no}] STDOUT:\n{out}")
+        #         print(f"[{no}] STDERR:\n{err}")
+
+        eqs = {}
         models = {no: self.model_config(self.get_expr() if template_spec else None) for no, _ in batches}
         for no, model in models.items():
             with open(f'./batch/eq/eq_{no}.pkl', 'rb') as f:  # type: ignore
-                best = pickle.load(f)
+                features, best = pickle.load(f)
                 if isinstance(model.expression_spec, TemplateExpressionSpec):
-                    varnames = sp.symbols(model.expression_spec.variable_names)
+                    var_symbols = sp.symbols(features)
                     eq = best['lambda_format']
-                    eq_str = best['equation']
-                    loss = best['loss']
-                    complexity = best['complexity']
-                    score = best['score']
-                    eq_lambda = sp.lambdify(varnames, eq, modules='numpy')
+                    eq_lambda = sp.lambdify(var_symbols, eq, modules='numpy')
+                    eqs[no] = eq_lambda
+            os.remove(f'./batch/eq/eq_{no}.pkl')
 
-            model.fit(X=X_dummy.to_frame().T, y=np.array([y_dummy]))
-
-            best = model.get_best().to_frame().copy()
-            best['equation'] = eq_str
-            best['labmda_format'] = eq_lambda
-            best['loss'] = loss
-            best['complexity'] = complexity
-            best['score'] = score
-
-            model.equations_ = best.T
-
+        batch_model = _BatchedPredictor(eqs,
+                                        self.target,
+                                        self.n_lags,
+                                        self.causal_lag_positions)
         X_test, y_test = test
-        preds = sum([m.predict(X_test, 0) for m in models.values()]) / len(models)
+        X_test = X_test.reindex(columns=features)
+        y_test = y_test.reindex(X_test.index)
+
+        preds = batch_model.predict(self.df, cast(pd.DatetimeIndex, X_test.index))
 
         fit_eval = {
             'R^2': r2_score(y_test, preds),
@@ -371,11 +405,7 @@ class AutoReg:
             'n_features': len(X_test.columns),
             'n_samples_per_batch': (len(self.df) * 0.8) // n,
         }
-        self.batched_model = _BatchedPredictor(
-            models,
-            self.target,
-            self.n_lags,
-            self.causal_lag_positions,
-            fit_eval=fit_eval
-        )
+        batch_model._fit_eval = fit_eval
+        self.batched_model = batch_model
+
         return self.batched_model
