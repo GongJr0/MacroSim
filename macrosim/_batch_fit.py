@@ -3,9 +3,8 @@
 import datetime as dt
 import os
 import pandas as pd
-import numpy as np
-from typing import Optional, cast, NewType, Callable, Any
-import builtins
+from typing import Optional, cast, Callable
+from AutoReg import ssqrt, EXTRA_GLOBALS  # type: ignore
 
 from pysr import PySRRegressor, TemplateExpressionSpec, ExpressionSpec, TensorBoardLoggerSpec  # type: ignore
 import sys
@@ -13,34 +12,24 @@ import pickle  # type: ignore
 import re
 import sympy as sp  # type: ignore
 
-MODEL_LOCALS = {
+MODEL_LOCALS: dict[str, Callable] = {
     'sin': sp.sin,
     'cos': sp.cos,
     'tan': sp.tan,
     'exp': sp.exp,
     'log': sp.log,
     'sqrt': sp.sqrt,
-    'pow': sp.Pow,  # Use SymPy's power function
+    'pow': sp.Pow,
 }
-
-ExprStr = NewType("ExprStr", str)
-
-
-def ssqrt(x: float) -> float:
-    return np.sign(x) * np.sqrt(np.abs(x))
-
-
-builtins.ssqrt = ssqrt  # type: ignore
 
 
 # Duplicate Functions from AutoReg.py to avoid import overhead
 def get_expr(X: pd.DataFrame, target: str) -> TemplateExpressionSpec:
+
     var_set = [col for col in X.columns if col.startswith(target)]
     params = {"w": len(var_set)}
 
-    sub_expr: ExprStr = cast(ExprStr,
-                             " + ".join([f"w[{n + 1}] * {col}" for n, col in enumerate(var_set)])
-                             )  # n+1 to match julia's 1-based indexing
+    sub_expr: str = " + ".join([f"w[{n + 1}] * {col}" for n, col in enumerate(var_set)])  # n+1 to match julia's 1-based indexing
     return TemplateExpressionSpec(
         expressions=["f"],
         variable_names=var_set,
@@ -54,16 +43,6 @@ def model_config(X: pd.DataFrame,
                  spec: Optional[TemplateExpressionSpec] = None,
                  log: bool = True,
                  logdir_child: Optional[str] = None) -> PySRRegressor:
-    # ==== Custom Operators ====
-    def safe_sqrt(x) -> float:
-        """This function has been used as a sign safe root replacement in many academic settings.
-        For a specific example matching the domain of AutoReg, refer to:
-
-        Teräsvirta, T. (1994). Specification, Estimation, and Evaluation of Smooth Transition Autoregressive Models.
-        Journal of the American Statistical Association."""
-        return np.sign(x) * np.sqrt(np.abs(x))
-
-    # ===========================
 
     size = len(X.columns) * 2
     spec = spec or ExpressionSpec()
@@ -87,7 +66,7 @@ def model_config(X: pd.DataFrame,
 
         binary_operators=['+', '-', '*', '/', 'pow'],
         unary_operators=['exp', 'log', 'ssqrt(x) = sign(x)*sqrt(abs(x))', 'sin', 'cos', 'tan'],
-        extra_sympy_mappings={'ssqrt': safe_sqrt},
+        extra_sympy_mappings={'ssqrt': ssqrt},
 
         constraints={
             'sin': 2,
@@ -115,7 +94,7 @@ def model_config(X: pd.DataFrame,
     return model
 
 
-def subs_expr(model: PySRRegressor) -> tuple[list, pd.Series]:
+def subs_expr(model: PySRRegressor) -> tuple[list, sp.Expr]:
     assert isinstance(model.expression_spec, TemplateExpressionSpec), "model.expression_spec must be a TemplateExpressionSpec"
 
     expr: TemplateExpressionSpec = model.expression_spec
@@ -127,33 +106,32 @@ def subs_expr(model: PySRRegressor) -> tuple[list, pd.Series]:
     assert isinstance(w, list), "w must be a list of coefficients"
     w_iter = iter(w)
 
-    def replacer(match):
+    def replacer(match: re.Match) -> str:
         return str(next(w_iter))
 
     func = expr.combine.replace("f(", "").replace(")", "")
-    func_inner = re.sub(r"w\[\d+\]", replacer, func)
+    func_inner = re.sub(r"w\[\d+]", replacer, func)
 
     func_full = outer.replace("#1", func_inner).replace("f =", "").replace("+ -", "- ").replace("- +", "- ").strip()
-    varnames = list(model.feature_names_in_)
+    varnames: list[str] = list(model.feature_names_in_)
+    var_symbols: set[sp.Symbol] = sp.symbols(varnames)
     symbol_map = {name: sp.Symbol(name) for name in varnames}
 
     eq = sp.sympify(func_full, locals={**MODEL_LOCALS, **symbol_map})  # type: ignore
 
-    best_df = model.get_best().copy()
-    best_df['equation'] = str(eq)
-    best_df['lambda_format'] = eq
-    best_df['julia_expression'] = None
-    return varnames, best_df
+    return varnames, eq
 
 
 def fit(X: pd.DataFrame, y: pd.Series | pd.DataFrame, template_spec: bool = True) -> PySRRegressor:
-    target = str(y.name) if isinstance(y, pd.Series) else y.columns[0]
-    spec = get_expr(X=X, target=target) if template_spec else ExpressionSpec()
+    target = str(y.name) if isinstance(y, pd.Series) else str(y.columns[0])
     log_dir = f"{target}_{dt.datetime.now().strftime('%b-%d_%H-%M')}/{batch_no}"
+    spec = get_expr(X=X, target=target) if template_spec else ExpressionSpec()
 
-    spec = get_expr(X=X, target=target)
-
-    model = model_config(X=X, target=target, spec=spec)
+    model = model_config(X=X,
+                         target=target,
+                         spec=spec,
+                         log=True,
+                         logdir_child=log_dir)
     model.fit(X=X, y=y)
 
     return model

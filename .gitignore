@@ -178,3 +178,4 @@ researchNotes/*
 /batch
 /logs
 *.pkl
+*.ipynb

@@ -1,10 +1,9 @@
 from statsmodels.tsa.stattools import grangercausalitytests as granger  # type: ignore # noqa
 
-import warnings
 from itertools import permutations
-from collections import defaultdict, Counter
+from collections import Counter
 from typing import Literal, cast, Optional
-from macrosim.stats.StatsTypes import FREQ_TO_PERIODS_PER_YEAR, DATA, LAG, PVAL, TestStats, SeriesInfo
+from .StatsTypes import FREQ_TO_PERIODS_PER_YEAR, DATA, LAG, PVAL, TestStats, SeriesInfo
 from dataclasses import dataclass
 
 import pandas as pd
@@ -118,8 +117,7 @@ class Causality:
         for col, inner in out.items():
             for inner_col, res in inner.items():
                 df_lags = pd.DataFrame(res, columns=["lag", "pval"])
-                grouped = df_lags.groupby("lag", as_index=False).agg({'pval': 'mean'})
-
+                grouped: pd.DataFrame = df_lags.groupby("lag", as_index=False).agg({'pval': 'mean'})  # type: ignore
                 aggregate_lag_pvals: list[tuple[LAG, PVAL]] = []
                 for _, row in grouped.iterrows():
                     lag = cast(LAG, row['lag'])
@@ -129,8 +127,6 @@ class Causality:
                 out[col][inner_col] = aggregate_lag_pvals
 
         return out
-
-
 
     @staticmethod
     def common_lag(gct_res: dict[str, dict[str, list[tuple[LAG, PVAL]]]]) -> LAG:
@@ -161,7 +157,6 @@ class CausalityResult:
             for col in self.tests.keys()
         }
         self.common_lag = Causality.common_lag(self.tests)
-
 
 
 @register_dataframe_accessor("causality")

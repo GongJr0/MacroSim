@@ -17,7 +17,7 @@ class SeriesAccessor:
 
     def __init__(self, key_path: Union[Path, str], key_name: str):
         key = self.get_key(key_path, key_name)
-        self.fred = Fred(api_key=key)
+        self.fred: Fred = Fred(api_key=key)
 
         del key
 
