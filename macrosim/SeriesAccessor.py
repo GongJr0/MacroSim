@@ -39,7 +39,7 @@ class SeriesAccessor:
                    date_range: tuple[dt.date, dt.date],
                    reindex_freq: Optional[str] = None,
                    *,
-                   series_alias: Optional[Union[Iterable[str] | Iterable[None]]] = None) -> pd.DataFrame:
+                   series_alias: Optional[Iterable[str | None]] = None) -> pd.DataFrame:
 
         _out = []
         _freq = []

@@ -148,7 +148,8 @@ class _Predictor(_AbstractPredictor):
 
     @property
     def fit_eval(self) -> dict[str, float | int]:
-        return self._fit_eval
+        rounded =  {k: round(v, 4) if isinstance(v, float) else v for k, v in self._fit_eval.items()}
+        return rounded
 
 
 class _BatchedPredictor(_AbstractPredictor):
@@ -195,7 +196,8 @@ class _BatchedPredictor(_AbstractPredictor):
 
     @property
     def fit_eval(self) -> dict[str, float | int]:
-        return self._fit_eval
+        rounded =  {k: round(v, 4) if isinstance(v, float) else v for k, v in self._fit_eval.items()}
+        return rounded
 
     def __getitem__(self, key: int) -> Callable:
         return self.eqs[key]
@@ -428,6 +430,7 @@ class AutoReg:
     def _batch_fit_parallel(self,
                             n: int,
                             template_spec: bool = True) -> _BatchedPredictor:
+
         def monitor_process(p, batch_id):
             stdout, stderr = p.communicate()
             if p.returncode != 0:

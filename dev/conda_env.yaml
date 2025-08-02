@@ -176,6 +176,7 @@ dependencies:
       - python-dateutil==2.9.0.post0
       - python-dotenv==1.1.1
       - python-json-logger==3.3.0
+      - python-newtype==0.1.6
       - pytz==2025.2
       - pywin32==311
       - pywin32-ctypes==0.2.3
