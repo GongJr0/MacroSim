@@ -1,0 +1,32 @@
+%! Author = guney
+%! Date = 03-Aug-25
+
+% Document
+\section{Modeling Methodology}\label{sec:modeling-methodology}
+\subsection{Overview}\label{subsec:overview}
+    MacroSim bases its discovery process on top of a simple $AR(n)$ process where $n$ defines the number of lags for the target variable.
+    The constant $c$ and error term $\epsilon$ are assumed 0 and inclusion of noise and linear offest is offloaded to the discovery engine.
+    \\
+
+    To aid discovery, supplementary variables are selected from the feature space through the use of \href{https://en.wikipedia.org/wiki/Granger_causality}{ Granger Causality Tests (GCT)} and \href{https://en.wikipedia.org/wiki/Augmented_Dickey%E2%80%93Fuller_test}{Augmented Dickey–Fuller Tests (ADF)}.
+    This creates a set of variables that are either direct lags of the target, or are both stationary and have a Granger causal relationship with the target.
+    \\
+
+    A symbolic regressor (SR) is responsible for patching these variables in a meaningful way while fitting the AR weights simultaneously.
+    Denoting the target as $y$ and the supplementary features as $X_i$, the ultimate resulting expression follows the form $f(AR_y(n), X_1, \dots, X_i)$.
+    This process applied to all variables in the feature space to produce a complete and self-sustaining simulation model.
+
+\subsection{Target Lag Selection}\label{subsec:target-lag-selection}
+    \dots
+
+\subsection{Feature Selection}\label{subsec:feature-selection}
+    \dots
+
+\subsection{Equation Discovery}\label{subsec:equation-discovery}
+    \dots
+
+\subsection{Recursive Simulation}\label{subsec:recursive-simulation}
+    \dots
+
+
+
