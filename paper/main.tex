@@ -7,10 +7,25 @@
 % Packages
 \usepackage{amsmath}
 \usepackage{indentfirst}
+\usepackage{footmisc}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{calc}
+\usepackage[a4paper, total={6in, 8in}]{geometry}
+\usepackage{cancel}
+
+\usepackage{graphicx}
+
+
+\usepackage{mathtools, nccmath}
+\DeclarePairedDelimiter{\nint}\lfloor\rceil
+
+
 
 \usepackage[colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue]{hyperref}
 
-
+\newlength{\ModuleColWidth}
+\setlength{\ModuleColWidth}{\textwidth - 4\tabcolsep}
 
 % Document
 \begin{document}
@@ -27,6 +42,9 @@
 
     \newpage
     \input{Introduction}
+
+    \newpage
+    \input{ModuleDescriptions}
 
     \newpage
     \input{ModelingMethodology}

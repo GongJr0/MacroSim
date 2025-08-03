@@ -179,3 +179,4 @@ researchNotes/*
 /logs
 *.pkl
 *.ipynb
+out/*
