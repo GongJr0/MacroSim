@@ -42,10 +42,10 @@ class Causality:
     @staticmethod
     def get_batch_size(data: DATA) -> int:
         freq = Causality.get_freq(data)
-        if (bsize := 4*freq) > len(data):
+        if (bsize := 8*freq) > len(data):
             warnings.warn(f"Consider increasing observation count if possible. "
                           f"{len(data)} observations found. "
-                          f"There's not enough observations to use the default batch size of 4*df_frequency. "
+                          f"There's not enough observations to use the default batch size of 8*df_frequency. "
                           f"Using single batch instead.",
                           category=UserWarning)
             bsize = len(data)
