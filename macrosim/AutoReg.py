@@ -1,3 +1,5 @@
+import sys
+
 import pandas as pd
 import numpy as np
 import sympy as sp  # type: ignore
@@ -21,8 +23,11 @@ import warnings
 
 from pysr import PySRRegressor, TemplateExpressionSpec, ExpressionSpec, TensorBoardLoggerSpec  # type: ignore
 
-from macrosim.stats.StatsTypes import DATA, LAG, FREQ_TO_PERIODS_PER_YEAR
+from macrosim.stats.StatsTypes import DATA, LAG, FREQ_TO_PERIODS_PER_YEAR, SeriesInfo
 
+def custom_showwarning(message, category, filename, lineno, file=None, line=None):
+    print(f"{category.__name__}: {message}", file=sys.stderr)
+warnings.showwarning = custom_showwarning
 
 def run_batch_process(args):
     no, template_spec = args
@@ -97,9 +102,11 @@ class _AbstractPredictor(ABC):
         target_df = pd.concat([target, *target_lags], axis=1)
         target_df.columns = [f"{self.target}_L{lag}" for lag in
                              range(1, self.target_lags + 1)]  # Feature name mathing
-
-        causal_lags = pd.concat([X[causal].shift(lag) for causal, lag in self.causal_lag_positions.items()], axis=1)
-        causal_lags.columns = [f"{causal}_L{lag}" for causal, lag in self.causal_lag_positions.items()]
+        if self.causal_lag_positions:
+            causal_lags = pd.concat([X[causal].shift(lag) for causal, lag in self.causal_lag_positions.items()], axis=1)
+            causal_lags.columns = [f"{causal}_L{lag}" for causal, lag in self.causal_lag_positions.items()]
+        else:
+            causal_lags = pd.DataFrame()
 
         X = pd.concat([target_df, causal_lags], axis=1)
         X = X.dropna(how='any')  # Drop rows with any NaN values
@@ -207,9 +214,15 @@ class _BatchedPredictor(_AbstractPredictor):
 
 
 class AutoReg:
-    def __init__(self, df: pd.DataFrame, target: str):
+    def __init__(self, df: pd.DataFrame, target: str, assert_stationarity: bool = False):
         assert df.shape[1] > 1, "DataFrame must contain at least one feature column and the target column."
         assert target in df.columns, f"Target column '{target}' not found in DataFrame."
+
+        if assert_stationarity:
+            warnings.warn("Enable assert_stationary with caution! MacroSim uses a 20% significance level for stationarity tests due "
+                          "to macroeconomic variables often being non-stationary under strict terms. "
+                          "Even with the relaxed significance level, you should expect most variables to be non-stationary.",
+                          category=UserWarning)
 
         self.df: pd.DataFrame = df
         self.target: str = target
@@ -217,6 +230,7 @@ class AutoReg:
         self.freq: int = AutoReg.get_freq(df)
         self.n_lags: LAG = cast(LAG, 2 * self.freq)  # 2m heuristic, can be adjusted based on domain knowledge
 
+        self.assert_stationarity: bool = assert_stationarity
         self.causal_lag_positions: dict[
             str, LAG] = {}  # Positions of causal lags in the DataFrame, populated at process_data time
 
@@ -245,6 +259,9 @@ class AutoReg:
         target_frame = target_frame.drop(columns=[self.target])
         return target_frame
 
+    def check_stationarity(self, col) -> bool:
+        return self.df.stationarity.is_stationary[col] == SeriesInfo.STATIONARY
+
     def get_causal_lags(self) -> pd.DataFrame | None:
         if (causal_dict := self.df.causality.tests[self.target]) is None:
             return pd.DataFrame()
@@ -252,6 +269,8 @@ class AutoReg:
         lags: list[pd.DataFrame] = []
         for col, res in causal_dict.items():
             if not res:
+                continue
+            if self.assert_stationarity and (not self.check_stationarity(col)):
                 continue
 
             period = sorted(res, key=lambda x: x[1])[0][0]  # Get the lag with the lowest p-value
@@ -521,3 +540,18 @@ class AutoReg:
                     return self.batched_model.predict(data, t_range)
                 else:
                     raise ValueError("No model fitted. Please fit a model before predicting.")
+
+    @property
+    def fit_eval(self) -> dict[str, float | int] | dict[str, dict[str, float | int]]:
+        if isinstance(self.model, _Predictor) and isinstance(self.batched_model, _Predictor):
+            return {
+                'single': self.model.fit_eval,
+                'ensemble': self.batched_model.fit_eval
+            }
+        elif isinstance(self.model, _Predictor):
+            return self.model.fit_eval
+
+        elif isinstance(self.batched_model, _BatchedPredictor):
+            return self.batched_model.fit_eval
+        else:
+            raise ValueError("No model fitted. Please fit a model before accessing fit_eval.")

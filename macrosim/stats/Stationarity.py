@@ -35,7 +35,7 @@ class Stationarity:
         for lag in range(1, Stationarity.max_lag(series)+1):
             _lag: LAG = cast(LAG, lag)
             result: tuple = cast(tuple, adfuller(series, maxlag=lag, autolag=None))
-            out[_lag] = PVAL(result[1])
+            out[_lag] = PVAL(result[1], alpha=0.2)  # High alpha since macroeconomic data is often non-stationary under strict conditions
 
         return cast(str, series.name), out
 
@@ -48,10 +48,13 @@ class Stationarity:
         return result
 
     @staticmethod
-    def common_lag(adf_result: dict[str, dict[int, PVAL]]) -> LAG:
+    def common_lag(adf_result: dict[str, dict[LAG, PVAL]]) -> LAG:
         critical_lags: list[LAG] = []
         for res in adf_result.values():
             critical_lags = [*critical_lags, *[cast(LAG, k) for k, v in res.items() if v.reject]]
+
+        if not critical_lags:
+            return cast(LAG, 0)
 
         counter = Counter(critical_lags)
         common_lag = min(
