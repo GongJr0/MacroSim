@@ -18,7 +18,7 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_absolute_percent
 from sklearn.utils import shuffle  # type: ignore
 
 from abc import ABC, abstractmethod
-from typing import cast, Union, Optional, Callable, Literal
+from typing import cast, Union, Optional, Callable, Literal, Any
 import warnings
 
 from pysr import PySRRegressor, TemplateExpressionSpec, ExpressionSpec, TensorBoardLoggerSpec  # type: ignore
@@ -239,6 +239,8 @@ class AutoReg:
         self.model: PySRRegressor = cast(PySRRegressor, None)  # Populated when fitting non-batched models
         self.batched_model: _BatchedPredictor = cast(_BatchedPredictor, None)  # Populated when fitting batched models
 
+        self.custom_params: dict[str, Any] | None = None  # Custom parameters for model configuration, populated when set_params is called
+
 # Data Prep
     @staticmethod
     def get_freq(df: DATA) -> int:
@@ -319,6 +321,11 @@ class AutoReg:
             combine=f"f({sub_expr})"
         )
 
+    def set_params(self, **kwargs) -> None:
+        assert set(kwargs.keys()) <= self._PARAM_SET, (f"Invalid Parameters Passed: {set(kwargs.keys()) - self._PARAM_SET}\n\n"
+                                                       f"Available Parameters: {self._PARAM_SET}")
+        self.custom_params = kwargs
+
     def model_config(self,
                      spec: Optional[TemplateExpressionSpec] = None,
                      log: bool = True,
@@ -371,6 +378,9 @@ class AutoReg:
             verbosity=1,
             logger_spec=logger,
         )
+        if self.custom_params:
+            model.set_params(**self.custom_params)
+            
         return model
 
     # Fit Methods
@@ -555,3 +565,10 @@ class AutoReg:
             return self.batched_model.fit_eval
         else:
             raise ValueError("No model fitted. Please fit a model before accessing fit_eval.")
+
+    # Misc Properties
+    @property
+    def _PARAM_SET(self) -> set[str]:
+        return set(
+            self.model_config().get_params().keys()
+        )
