@@ -49,7 +49,7 @@
     Alongside other processes such as training and testing set generation, this can lead to a sizable decrease in usable observations.
 
 \subsection{Feature Selection}\label{subsec:feature-selection}
-\subsubsection{Granger Causality}
+\subsubsection{Granger Causality}\label{subsubsec:granger-causality}
     By definition, Granger causality tests the predictive power of a variable's past values on the current value of the target.
     Informally, the test structure can be denoted as follows:
     \begin{gather*}
@@ -66,7 +66,7 @@
     MacroSim adopts the F-statistic and performs local causality tests over slices of the data.
     The slices are sized to cover an 8-year period, and the \texttt{max\_lag} parameter is dynamically set through the formula:
     \begin{equation*}
-        max\_lag = \nint*{\frac{N_{obs}}{20\cdot freq}\cdot \ln (N_{obs})}
+        max\_lag = \rnd*{\frac{N_{obs}}{20\cdot freq}\cdot \ln (N_{obs})}
     \end{equation*}
 
     This formula provides an almost linear increase in lag size for larger datasets, while smaller datasets receive more conservative lag sizes.
@@ -78,8 +78,44 @@
       \label{fig:quarterly-output}
     \end{figure}
 
+\subsubsection{Stationarity Tests}\label{subsubsec:stationarity-tests}
+    Stationary series are more likely to be robust and reliable features due to their consistent statistical properties over time.
+    Features with non-stationary behavior can exhibit different trends at test time, compared to the training time.
+    Although shuffling and batching can combat this by incorporating a random sample of observations into training, MacroSim offers the option to filter out non-stationary features.
+    \\
+
+    MacroSim takes a simple approach to defining and executing stationarity tests.
+    An ADF test is performed on each feature, for lags up to $ \texttt{n\_lags} = \cei*{\sqrt{N_{obs}}} $.
+    Macroeconomic variables tend to have trends that evolve over time, directly contradicting the assumptions of stationarity.
+    Therefore, the ADF tests are computed for $\alpha = 0.2$.
+    Despite the high significance level, and the correspondingly large critical region, it is very possible that the majority of the features will be non-stationary.
+    MacroSim implements a warning to inform users of this and encourages testing/caution before asserting stationarity in the feature space.
+
 \subsection{Equation Discovery}\label{subsec:equation-discovery}
-    \dots
+\subsubsection{Equation Components}\label{subsubsec:equation-components}
+    Although the equation discovery is ultimately handled through SR, it is important to know and navigate the parameters and components of the search space to limit the scope of the search.
+    SR is infamously prone to overfitting due to its evolutionary search algorithms.
+    It has the ability to add, remove, and modify terms or constants to precisely fit the curve which is very powerful compared to more static regression methods.
+    The models are not meant to run at default parameters in most cases, and incorporating domain knowledge into the configuration is essential to avoid overfitting and ensure the model's robustness.
+    \\
+
+    MacroSim uses \texttt{PySRRegressor} of the \texttt{pysr} library to perform symbolic regression.
+    All \texttt{PySRRegressor} parameters are directly accessible to users and some defaults\footnote[2]{No parameters that change the model weights, or evolution behavior are adjusted. Changes were made to parameters concerning complexity constrataints, allowed operations, model size, and iteration limits.} are modified to better suit the macroeconomic context.
+    The model receives a \texttt{TemplateExpressionSpec} as a parameter that defines the structure of function inputs, and can restrict the shapes the function can take.
+    \\
+
+    The model has access to $\sin(x)$, $\cos(x)$, $\tan(x)$, $e^x$, $\sqrt{x}$, and $\ln(x)$ as unary operators, while basic arithmetic and exponentiation are available as binary operators.
+    The maximum allowed complexity of the variable $x$ can be constrained for each of these operators individually.
+
+\subsubsection{Evolutionary Search}\label{subsubsec:evolutionary-search}
+    The search algorithm implemented in \texttt{pysr} is simple in its fundamentals.
+    This allows users to have a general idea on where the search will start and how its first few evolutionary steps are likely to progress.
+    For illustration, in all configurations, the search starts with the function $f(X) = X$ where $X$ is any of the available features.
+    In most model configurations, early evolutions lead toward a simple linear form $f(X) = aX + b$ and the model continues to build more complex expressions.
+    \\
+
+    For MacroSim's purposes, the initial expression being $f(X) = X$ is very important as it guarantees that the \texttt{PySRRegressor} will take at least \texttt{n\_iterations} steps on this simple form, before adding an evolutionary component.
+    Having a template expression containing the AR process results in the initial expression $f(AR(X)) = AR(X)$ allows the model to exclusively focus on the weights during these initial steps and the rest of the search essentially serves the purpose of a secondary model fitted to the residuals of the AR process.
 
 \subsection{Recursive Simulation}\label{subsec:recursive-simulation}
     \dots

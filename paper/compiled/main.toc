@@ -1,0 +1,26 @@
+\contentsline {section}{\numberline {1}Introduction}{3}{section.1}%
+\contentsline {section}{\numberline {2}Module Descriptions}{4}{section.2}%
+\contentsline {section}{\numberline {3}Modeling Methodology}{5}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Overview}{5}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Data Preparation}{5}{subsection.3.2}%
+\contentsline {subsubsection}{\numberline {3.2.1}Collection and Formatting}{5}{subsubsection.3.2.1}%
+\contentsline {subsubsection}{\numberline {3.2.2}Splitting}{5}{subsubsection.3.2.2}%
+\contentsline {subsubsection}{\numberline {3.2.3}Inter-Process Data Transmission}{5}{subsubsection.3.2.3}%
+\contentsline {subsection}{\numberline {3.3}Target Lag Selection}{6}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Feature Selection}{6}{subsection.3.4}%
+\contentsline {subsubsection}{\numberline {3.4.1}Granger Causality}{6}{subsubsection.3.4.1}%
+\contentsline {subsubsection}{\numberline {3.4.2}Stationarity Tests}{7}{subsubsection.3.4.2}%
+\contentsline {subsection}{\numberline {3.5}Equation Discovery}{8}{subsection.3.5}%
+\contentsline {subsubsection}{\numberline {3.5.1}Equation Components}{8}{subsubsection.3.5.1}%
+\contentsline {subsubsection}{\numberline {3.5.2}Evolutionary Search}{8}{subsubsection.3.5.2}%
+\contentsline {subsection}{\numberline {3.6}Recursive Simulation}{9}{subsection.3.6}%
+\contentsline {section}{\numberline {4}Library Specifications}{10}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Core Dependencies}{10}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Module Structure}{10}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Usage}{10}{subsection.4.3}%
+\contentsline {section}{\numberline {5}Limitations}{11}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Variable Suitability}{11}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Model Complexity}{11}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Computational Resources}{11}{subsection.5.3}%
+\contentsline {section}{\numberline {6}Appendix}{12}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Dependency Table}{12}{subsection.6.1}%
