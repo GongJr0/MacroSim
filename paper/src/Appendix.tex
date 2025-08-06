@@ -1,0 +1,24 @@
+%! Author = guney
+%! Date = 03-Aug-25
+
+\section{Appendix}\label{sec:appendix}
+\subsection{Dependency Table}\label{subsec:core-module-dependencies}
+\begin{tabular}{ |m{2in}|m{3in}| }
+    \hline
+    \centering\arraybackslash\textbf{Library Function} & \centering\arraybackslash\textbf{Package Dependency} \\
+    \hline
+    \texttt{SeriesAccessor\textsuperscript{*}} & \texttt{fredapi, dotenv, pandas} \\
+    \hline
+    \texttt{Causality} & \texttt{scikit-learn, numpy, pandas} \\
+    \hline
+    \texttt{Stationarity} & \texttt{scikit-learn, pandas} \\
+    \hline
+    \texttt{AutoReg} & \texttt{pysr, numpy, scikit-learn, pandas, tensorboard\textsuperscript{**}} \\
+    \hline
+\end{tabular}
+
+\vspace{1em}
+\footnotesize\noindent\textsuperscript{*} The module itself is for optional use.\ If used, the dependencies are required.
+
+\vspace{1em}
+\footnotesize\noindent\textsuperscript{**} The \texttt{tensorboard} dependency is only required if the user wants to use the tensorboard logging functionality of \texttt{AutoReg}. It is not required for the core functionality of the module.

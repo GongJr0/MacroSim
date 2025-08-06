@@ -1,0 +1,29 @@
+%! Author = guney
+%! Date = 03-Aug-25
+
+\section{Module Descriptions}\label{sec:module-descriptions}
+\begin{tabular}{ |m{2in}|m{2.27in}|>{\centering\arraybackslash}m{1in}| }
+ \hline
+ \multicolumn{3}{|>{\centering\arraybackslash}m{5.27in}|}{\textbf{MacroSim Modules}} \\
+ \hline
+ \multicolumn{1}{|>{\centering\arraybackslash}m{2in}|}{\textbf{Module}} &
+ \multicolumn{1}{>{\centering\arraybackslash}m{2.27in}|}{\textbf{Description}} &
+ \multicolumn{1}{>{\centering\arraybackslash}m{1in}|}{\textbf{User Accessible}} \\
+ \hline
+ \texttt{SeriesAccessor} & Collects data from \href{https://fred.stlouisfed.org/}{FRED} and formats it into the expected structure. & \textbf{YES} \\
+ \hline
+ \texttt{AutoReg} & Prepares the data, selects lags and features, and runs autoregression based symbolic equation discovery. & \textbf{YES} \\
+ \hline
+ \texttt{AutoReg.\_Predictor} & Contains a single fitted expression ready for prediction. Outputted from \texttt{AutoReg}. & \textbf{YES} \\
+ \hline
+ \texttt{AutoReg.\_BatchedPredictor} & Contains multiple fitted expressions ready for prediction. Outputted from \texttt{AutoReg}. & \textbf{YES} \\
+ \hline
+ \texttt{stats.Causality} & Automatically computes causality tests and attaches the results to the \texttt{DataFrame}. & \textbf{NO} \\
+ \hline
+ \texttt{stats.Stationarity} & Automatically computes stationarity tests and attaches the results to the \texttt{DataFrame}. & \textbf{NO} \\
+ \hline
+ \texttt{\_batch\_fit} & Script for parallel execution of ensemble learning. Called during fit-time of a \texttt{BatchedPredictor}. & \textbf{NO} \\
+ \hline
+\end{tabular}
+
+

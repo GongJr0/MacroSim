@@ -1,0 +1,62 @@
+%! Author = guney
+%! Date = 03-Aug-25
+
+% Preamble
+\documentclass[11pt]{article}
+
+% Packages
+\usepackage{amsmath}
+\usepackage{indentfirst}
+\usepackage{footmisc}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{calc}
+\usepackage[a4paper, total={6in, 8in}]{geometry}
+\usepackage{cancel}
+
+\usepackage{graphicx}
+
+
+\usepackage{mathtools, nccmath}
+\DeclarePairedDelimiter{\rnd}\lfloor\rceil
+\DeclarePairedDelimiter{\cei}\lceil\rceil
+\DeclarePairedDelimiter{\flr}\lfloor\rfloor
+
+
+\usepackage[colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue]{hyperref}
+
+\newlength{\ModuleColWidth}
+\setlength{\ModuleColWidth}{\textwidth - 4\tabcolsep}
+
+% Document
+\begin{document}
+    \title{MacroSim: Recursive Endogenous Simulation Library for Macroeconomic Models}
+    \author{Güney Kıymaç}
+    \date{\today}
+    \maketitle
+
+    \newpage
+    \begingroup
+    \hypersetup{hidelinks}
+    \tableofcontents
+    \endgroup
+
+    \newpage
+    \input{Introduction}
+
+    \newpage
+    \input{ModuleDescriptions}
+
+    \newpage
+    \input{ModelingMethodology}
+
+    \newpage
+    \input{LibrarySpecifications}
+
+    \newpage
+    \input{Limitations}
+
+    \newpage
+    \input{Appendix}
+
+\end{document}
